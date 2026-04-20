@@ -1,585 +1,201 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Micro vers vibrations rythmiques</title>
-  <style>
-    * { box-sizing: border-box; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Neural Network - Hand Control</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      font-family: sans-serif;
-      line-height: 1.5;
-      background: #0f0f0f;
-      color: #e8e8e8;
-    }
-
-    main {
-      width: min(26rem, calc(100vw - 2rem));
-      padding: 1.5rem;
-      background: #1a1a1a;
-      border-radius: 1rem;
-      border: 1px solid #2a2a2a;
-    }
-
-    h1 {
-      margin: 0 0 0.25rem;
-      font-size: 1.1rem;
-      color: #fff;
-    }
-
-    .subtitle {
-      font-size: 0.8rem;
-      color: #666;
-      margin: 0 0 1.25rem;
-    }
-
-    .controls {
-      display: flex;
-      gap: 0.6rem;
-      margin-bottom: 1.25rem;
-    }
-
-    button {
-      font: inherit;
-      font-size: 0.9rem;
-      padding: 0.6rem 1rem;
-      cursor: pointer;
-      border-radius: 0.5rem;
-      border: none;
-      transition: opacity 0.15s;
-    }
-
-    button:disabled { opacity: 0.35; cursor: default; }
-
-    #startButton  { background: #6c47ff; color: #fff; }
-    #stopButton   { background: #333; color: #ccc; }
-    #calibBtn     { background: #1f3a2a; color: #4ade80; border: 1px solid #2d5c3a; }
-
-    /* Vumètres */
-    .meters {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .meter-row {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-    }
-
-    .meter-label {
-      width: 4rem;
-      font-size: 0.72rem;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .meter-track {
-      flex: 1;
-      height: 6px;
-      background: #2a2a2a;
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .meter-bar {
-      height: 100%;
-      width: 0%;
-      border-radius: 3px;
-      transition: width 0.05s linear;
-    }
-
-    #bar-kick  { background: #f97316; }
-    #bar-snare { background: #a78bfa; }
-    #bar-hihat { background: #38bdf8; }
-
-    .meter-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #2a2a2a;
-      transition: background 0.08s;
-      flex-shrink: 0;
-    }
-
-    .meter-dot.active { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
-
-    #status {
-      margin: 0;
-      font-size: 0.82rem;
-      color: #888;
-      white-space: pre-line;
-      min-height: 1.4em;
-    }
-
-    .calib-bar-wrap {
-      display: none;
-      height: 4px;
-      background: #2a2a2a;
-      border-radius: 2px;
-      overflow: hidden;
-      margin-bottom: 0.75rem;
-    }
-
-    #calibProgress {
-      height: 100%;
-      width: 0%;
-      background: #4ade80;
-      transition: width 0.1s linear;
-    }
-  </style>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
+        canvas { display: block; }
+        #ui {
+            position: absolute; top: 20px; left: 20px; color: #00f2ff;
+            pointer-events: none; text-transform: uppercase; letter-spacing: 2px;
+        }
+        .stats { font-size: 12px; margin-top: 10px; opacity: 0.7; }
+        .hint {
+            position: absolute; bottom: 30px; width: 100%; text-align: center;
+            color: #fff; font-size: 14px; opacity: 0.5; animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+    </style>
 </head>
 <body>
-  <main>
-    <h1>🎵 Vibrations rythmiques</h1>
-    <p class="subtitle">Capte la musique · Ignore le bruit</p>
 
-    <div class="controls">
-      <button id="startButton" type="button">▶ Start</button>
-      <button id="stopButton"  type="button" disabled>■ Stop</button>
-      <button id="calibBtn"    type="button" disabled>⚡ Calibrer</button>
-    </div>
+<div id="ui">
+    <div style="font-size: 24px; font-weight: bold;">Neural Core v2.0</div>
+    <div id="status" class="stats">Initialisation du flux vidéo...</div>
+    <div id="zoom-level" class="stats">Scale: 1.0x</div>
+</div>
 
-    <div class="calib-bar-wrap" id="calibWrap">
-      <div id="calibProgress"></div>
-    </div>
+<div class="hint">Ecartez le pouce et l'index pour zoomer • Approchez vos mains des neurones</div>
 
-    <div class="meters">
-      <div class="meter-row">
-        <span class="meter-label">Kick</span>
-        <div class="meter-track"><div class="meter-bar" id="bar-kick"></div></div>
-        <div class="meter-dot" id="dot-kick"></div>
-      </div>
-      <div class="meter-row">
-        <span class="meter-label">Snare</span>
-        <div class="meter-track"><div class="meter-bar" id="bar-snare"></div></div>
-        <div class="meter-dot" id="dot-snare"></div>
-      </div>
-      <div class="meter-row">
-        <span class="meter-label">Hi-hat</span>
-        <div class="meter-track"><div class="meter-bar" id="bar-hihat"></div></div>
-        <div class="meter-dot" id="dot-hihat"></div>
-      </div>
-    </div>
+<video id="input_video" style="display:none"></video>
+<canvas id="output_canvas"></canvas>
 
-    <p id="status">Inactif.</p>
-  </main>
+<script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const statusText = document.getElementById('status');
+    const zoomText = document.getElementById('zoom-level');
 
-  <script>
-    // ─── DOM ────────────────────────────────────────────────────────────────────
-    const startButton    = document.getElementById("startButton");
-    const stopButton     = document.getElementById("stopButton");
-    const calibBtn       = document.getElementById("calibBtn");
-    const statusNode     = document.getElementById("status");
-    const calibWrap      = document.getElementById("calibWrap");
-    const calibProgress  = document.getElementById("calibProgress");
+    let nodes = [];
+    let currentScale = 1;
+    let targetScale = 1;
+    const NODE_COUNT = 60;
+    const CONNECT_DIST = 180;
 
-    const bars = {
-      kick:  document.getElementById("bar-kick"),
-      snare: document.getElementById("bar-snare"),
-      hihat: document.getElementById("bar-hihat"),
-    };
-    const dots = {
-      kick:  document.getElementById("dot-kick"),
-      snare: document.getElementById("dot-snare"),
-      hihat: document.getElementById("dot-hihat"),
-    };
-
-    // ─── ÉTAT AUDIO ─────────────────────────────────────────────────────────────
-    let audioContext     = null;
-    let analyser         = null;
-    let sourceNode       = null;
-    let inputGain        = null;
-    let microphoneStream = null;
-    let frequencyData    = null;
-    let animationId      = 0;
-
-    // ─── FLAGS ──────────────────────────────────────────────────────────────────
-    let running          = false;
-    let starting         = false;
-    let stopping         = false;
-    let pageHidden       = false;
-    let calibrating      = false;
-
-    // ─── VIBRATION ──────────────────────────────────────────────────────────────
-    let vibrationBusyUntil = 0;
-    const MUTE_AFTER_VIB_MS = 100; // silence micro après vibration
-
-    // ─── BANDES FRÉQUENCES ──────────────────────────────────────────────────────
-    const BAND_LIMITS = {
-      kick:  [40,  150],   // on ignore < 40 Hz (rumble mécanique des vibrations)
-      snare: [200, 2000],  // on monte à 200 Hz pour éviter le chevauchement kick
-      hihat: [2500, 12000] // on plafonne à 12kHz (au-delà = souffle micro)
-    };
-
-    const BAND_CONFIG = {
-      kick:  { cooldownMs: 260, label: "KICK"   },
-      snare: { cooldownMs: 210, label: "SNARE"  },
-      hihat: { cooldownMs: 130, label: "HI-HAT" },
-    };
-
-    // ─── PLANCHER DE BRUIT ──────────────────────────────────────────────────────
-    // Initialisé à une valeur par défaut, mis à jour par la calibration
-    let noiseFloor = { kick: 18, snare: 14, hihat: 10 };
-
-    // Marge au-dessus du plancher pour déclencher (en unités 0–255)
-    const TRIGGER_MARGIN = { kick: 14, snare: 12, hihat: 9 };
-
-    // ─── DÉTECTION DE TRANSITOIRES ──────────────────────────────────────────────
-    // On compare l'énergie actuelle à l'énergie lissée du passé récent.
-    // Une attaque musicale = pic soudain >> moyenne.
-    // Un bruit de fond ou vibration = pas de pic relatif.
-    const prevEnergy   = { kick: 0, snare: 0, hihat: 0 };
-    const smoothEnergy = { kick: 0, snare: 0, hihat: 0 };
-    const SMOOTH_ALPHA = 0.85; // lissage lent (mémoire du passé)
-    const TRANSIENT_RATIO = 1.35; // l'énergie doit être 35% > la moyenne pour compter
-
-    // ─── ÉTAT PAR BANDE ─────────────────────────────────────────────────────────
-    const bandState = {
-      kick:  { lastTriggerAt: 0, energy: 0 },
-      snare: { lastTriggerAt: 0, energy: 0 },
-      hihat: { lastTriggerAt: 0, energy: 0 },
-    };
-
-    // ─── UTILS ──────────────────────────────────────────────────────────────────
-    let lastStatus = "";
-    function setStatus(msg) {
-      if (msg !== lastStatus) { statusNode.textContent = msg; lastStatus = msg; }
-    }
-
-    function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
-
-    function getPatternDuration(p) { return p.reduce((a, b) => a + b, 0); }
-
-    function isSecure() {
-      return window.isSecureContext ||
-             location.hostname === "localhost" ||
-             location.hostname === "127.0.0.1";
-    }
-
-    function envIssue() {
-      if (!isSecure())
-        return "Ouvre la page en HTTPS (ex. GitHub Pages).";
-      if (!navigator.mediaDevices?.getUserMedia)
-        return "Micro non disponible dans ce navigateur.";
-      if (!navigator.vibrate)
-        return "Vibration non prise en charge ici.";
-      return "";
-    }
-
-    function errMsg(e) {
-      const n = e?.name ?? "Erreur";
-      if (n === "NotAllowedError" || n === "PermissionDeniedError")
-        return "Micro refusé.\nAutorise le micro dans Chrome Android.";
-      if (n === "NotFoundError") return "Aucun micro détecté.";
-      if (n === "NotReadableError") return "Micro occupé ou inaccessible.";
-      if (n === "SecurityError") return "Contexte non sécurisé.";
-      return n + (e?.message ? "\n" + e.message : "");
-    }
-
-    function resetBandState() {
-      for (const k of Object.keys(bandState)) {
-        bandState[k].lastTriggerAt = 0;
-        bandState[k].energy = 0;
-        prevEnergy[k]   = 0;
-        smoothEnergy[k] = 0;
-      }
-    }
-
-    // ─── LECTURE FRÉQUENCES ─────────────────────────────────────────────────────
-    function getBinRange(minHz, maxHz) {
-      const nyquist  = audioContext.sampleRate / 2;
-      const binWidth = nyquist / analyser.frequencyBinCount;
-      const start    = Math.max(1, Math.floor(minHz / binWidth));
-      const safeMax  = Number.isFinite(maxHz) ? maxHz : nyquist;
-      const end      = Math.min(analyser.frequencyBinCount - 1, Math.ceil(safeMax / binWidth));
-      return [start, Math.max(start, end)];
-    }
-
-    function getBandEnergy(minHz, maxHz) {
-      const [s, e] = getBinRange(minHz, maxHz);
-      let sum = 0, count = 0;
-      for (let i = s; i <= e; i++) { sum += frequencyData[i]; count++; }
-      return count > 0 ? sum / count : 0;
-    }
-
-    // ─── CALIBRATION BRUIT AMBIANT ──────────────────────────────────────────────
-    // On mesure ~1s de silence pour établir le plancher de bruit réel du micro
-    const CALIB_FRAMES = 40; // ~40 frames ≈ 660ms
-
-    async function calibrate() {
-      if (!running || calibrating) return;
-      calibrating = true;
-      calibBtn.disabled = true;
-      calibWrap.style.display = "block";
-
-      const samples = { kick: [], snare: [], hihat: [] };
-      let frame = 0;
-
-      await new Promise(resolve => {
-        function sampleFrame() {
-          if (frame >= CALIB_FRAMES) { resolve(); return; }
-
-          analyser.getByteFrequencyData(frequencyData);
-          samples.kick.push( getBandEnergy(BAND_LIMITS.kick[0],  BAND_LIMITS.kick[1]));
-          samples.snare.push(getBandEnergy(BAND_LIMITS.snare[0], BAND_LIMITS.snare[1]));
-          samples.hihat.push(getBandEnergy(BAND_LIMITS.hihat[0], BAND_LIMITS.hihat[1]));
-
-          calibProgress.style.width = ((frame / CALIB_FRAMES) * 100) + "%";
-          frame++;
-          requestAnimationFrame(sampleFrame);
+    // --- INITIALISATION DU RESEAU ---
+    function initNodes() {
+        canvasElement.width = window.innerWidth;
+        canvasElement.height = window.innerHeight;
+        nodes = [];
+        for (let i = 0; i < NODE_COUNT; i++) {
+            nodes.push({
+                x: Math.random() * canvasElement.width,
+                y: Math.random() * canvasElement.height,
+                vx: (Math.random() - 0.5) * 1.5,
+                vy: (Math.random() - 0.5) * 1.5,
+                radius: Math.random() * 2 + 1
+            });
         }
-        requestAnimationFrame(sampleFrame);
-      });
-
-      // Plancher = percentile 90 des échantillons (prend le bruit de pic, pas la moyenne)
-      function p90(arr) {
-        const sorted = [...arr].sort((a, b) => a - b);
-        return sorted[Math.floor(sorted.length * 0.90)];
-      }
-
-      noiseFloor.kick  = p90(samples.kick);
-      noiseFloor.snare = p90(samples.snare);
-      noiseFloor.hihat = p90(samples.hihat);
-
-      calibProgress.style.width = "100%";
-      setTimeout(() => {
-        calibWrap.style.display = "none";
-        calibProgress.style.width = "0%";
-      }, 400);
-
-      calibrating = false;
-      calibBtn.disabled = false;
-      setStatus(
-        `Calibré ✓\nKick plancher: ${noiseFloor.kick.toFixed(1)}\n` +
-        `Snare: ${noiseFloor.snare.toFixed(1)}  Hi-hat: ${noiseFloor.hihat.toFixed(1)}`
-      );
     }
 
-    // ─── PATTERN VIBRATION ──────────────────────────────────────────────────────
-    function buildPattern(type, intensity) {
-      if (type === "kick") {
-        return [Math.round(28 + intensity * 55), 65];
-      }
-      if (type === "snare") {
-        const p = Math.round(16 + intensity * 26);
-        const g = Math.round(22 - intensity * 7);
-        return [p, g, p, 55];
-      }
-      const m = Math.round(7 + intensity * 9);
-      return [m, 10, m, 10, m, 38];
+    // --- CALCULS ---
+    function getDist(p1, p2) {
+        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
     }
 
-    // ─── COUPE MICRO PENDANT VIBRATION ──────────────────────────────────────────
-    function muteInputDuring(durationMs) {
-      if (!inputGain || !audioContext) return;
-      inputGain.gain.cancelScheduledValues(audioContext.currentTime);
-      inputGain.gain.setValueAtTime(0, audioContext.currentTime);
-      const t = audioContext.currentTime + (durationMs + MUTE_AFTER_VIB_MS) / 1000;
-      inputGain.gain.setValueAtTime(1, t);
-    }
+    function onResults(results) {
+        // Nettoyage et dessin de la vidéo en fond
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        
+        // Effet miroir pour la vidéo
+        canvasCtx.translate(canvasElement.width, 0);
+        canvasCtx.scale(-1, 1);
+        canvasCtx.globalAlpha = 0.25; // Sombre pour faire ressortir le néon
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.restore();
 
-    // ─── MISE À JOUR DES ÉNERGIES ────────────────────────────────────────────────
-    function updateBandEnergies() {
-      analyser.getByteFrequencyData(frequencyData);
-      for (const k of ["kick", "snare", "hihat"]) {
-        const raw = getBandEnergy(BAND_LIMITS[k][0], BAND_LIMITS[k][1]);
-        bandState[k].energy = raw;
+        let fingerInteractions = [];
 
-        // Mise à jour de l'énergie lissée (moyenne exponentielle du passé)
-        smoothEnergy[k] = SMOOTH_ALPHA * smoothEnergy[k] + (1 - SMOOTH_ALPHA) * raw;
-      }
-    }
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            statusText.innerText = "Système : Mains détectées";
+            
+            results.multiHandLandmarks.forEach(landmarks => {
+                // Coordonnées MediaPipe (0 à 1) -> Pixels (Inversé pour le miroir)
+                const thumb = { x: (1 - landmarks[4].x) * canvasElement.width, y: landmarks[4].y * canvasElement.height };
+                const index = { x: (1 - landmarks[8].x) * canvasElement.width, y: landmarks[8].y * canvasElement.height };
+                
+                fingerInteractions.push(thumb, index);
 
-    // ─── SÉLECTION DE LA BANDE DOMINANTE ────────────────────────────────────────
-    function selectDominantBand(now) {
-      let bestBand = null, bestScore = 0;
-
-      for (const [type, config] of Object.entries(BAND_CONFIG)) {
-        const energy  = bandState[type].energy;
-        const floor   = noiseFloor[type];
-        const margin  = TRIGGER_MARGIN[type];
-        const ready   = now - bandState[type].lastTriggerAt >= config.cooldownMs;
-
-        // ① L'énergie doit dépasser le plancher + marge
-        const aboveFloor = energy > floor + margin;
-
-        // ② Détection de transitoire : l'énergie doit avoir bondi par rapport à la moyenne lissée
-        // → ignore le bruit de fond constant (y compris retours de vibration)
-        const isTransient = energy > smoothEnergy[type] * TRANSIENT_RATIO;
-
-        if (ready && aboveFloor && isTransient) {
-          const score = energy - floor;
-          if (score > bestScore) {
-            bestBand  = type;
-            bestScore = score;
-          }
+                // Geste de Zoom Dynamique
+                const d = getDist(thumb, index);
+                targetScale = Math.max(0.5, Math.min(2.5, d / 150));
+                
+                // Dessin du tracking des doigts (Optionnel, style HUD)
+                canvasCtx.strokeStyle = '#00f2ff';
+                canvasCtx.lineWidth = 2;
+                canvasCtx.beginPath();
+                canvasCtx.arc(index.x, index.y, 8, 0, 2*Math.PI);
+                canvasCtx.stroke();
+            });
+        } else {
+            statusText.innerText = "Système : En attente de détection...";
+            targetScale = 1;
         }
-      }
 
-      return bestBand;
+        // Lissage du zoom
+        currentScale += (targetScale - currentScale) * 0.1;
+        zoomText.innerText = `Scale: ${currentScale.toFixed(2)}x`;
+
+        drawNetwork(fingerInteractions);
     }
 
-    // ─── BOUCLE PRINCIPALE ──────────────────────────────────────────────────────
-    function tick(now) {
-      if (!running || !analyser || !frequencyData) return;
+    // --- DESSIN DU RÉSEAU ---
+    function drawNetwork(fingers) {
+        canvasCtx.save();
+        
+        // Application du zoom centré
+        canvasCtx.translate(canvasElement.width/2, canvasElement.height/2);
+        canvasCtx.scale(currentScale, currentScale);
+        canvasCtx.translate(-canvasElement.width/2, -canvasElement.height/2);
 
-      updateBandEnergies();
+        // Style néon
+        canvasCtx.shadowBlur = 10;
+        canvasCtx.shadowColor = '#00f2ff';
+        canvasCtx.globalCompositeOperation = 'lighter';
 
-      // Mise à jour des vumètres (toujours, même pendant vibration)
-      for (const k of ["kick", "snare", "hihat"]) {
-        const e     = bandState[k].energy;
-        const floor = noiseFloor[k];
-        const pct   = clamp(((e - floor) / (180 - floor)) * 100, 0, 100);
-        bars[k].style.width = pct + "%";
-      }
+        nodes.forEach((node, i) => {
+            // Animation
+            node.x += node.vx;
+            node.y += node.vy;
 
-      if (pageHidden || now < vibrationBusyUntil) {
-        animationId = requestAnimationFrame(tick);
-        return;
-      }
+            // Rebond
+            if (node.x < 0 || node.x > canvasElement.width) node.vx *= -1;
+            if (node.y < 0 || node.y > canvasElement.height) node.vy *= -1;
 
-      const sel = selectDominantBand(now);
-      if (sel) {
-        const config    = BAND_CONFIG[sel];
-        const energy    = bandState[sel].energy;
-        const floor     = noiseFloor[sel];
-        const intensity = clamp((energy - floor) / (180 - floor), 0, 1);
-        const pattern   = buildPattern(sel, intensity);
-        const duration  = getPatternDuration(pattern);
+            // Attraction par les mains
+            fingers.forEach(f => {
+                const d = getDist(node, f);
+                if (d < 250) {
+                    node.x += (f.x - node.x) * 0.03;
+                    node.y += (f.y - node.y) * 0.03;
+                }
+            });
 
-        navigator.vibrate(pattern);
-        bandState[sel].lastTriggerAt = now;
-        vibrationBusyUntil = now + duration;
-        muteInputDuring(duration);
+            // Dessin Neurone
+            canvasCtx.beginPath();
+            canvasCtx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+            canvasCtx.fillStyle = '#fff';
+            canvasCtx.fill();
 
-        // Flash du dot
-        dots[sel].classList.add("active");
-        setTimeout(() => dots[sel].classList.remove("active"), 120);
-
-        setStatus("● " + config.label);
-      } else {
-        setStatus("Actif — en écoute…");
-      }
-
-      animationId = requestAnimationFrame(tick);
-    }
-
-    // ─── STOP ────────────────────────────────────────────────────────────────────
-    async function stop() {
-      if (stopping) return;
-      stopping = true; running = false; starting = false;
-
-      if (animationId) { cancelAnimationFrame(animationId); animationId = 0; }
-
-      sourceNode?.disconnect(); sourceNode = null;
-      inputGain?.disconnect();  inputGain  = null;
-      analyser?.disconnect();   analyser   = null;
-
-      microphoneStream?.getTracks().forEach(t => t.stop());
-      microphoneStream = null;
-
-      if (audioContext) {
-        const ctx = audioContext; audioContext = null;
-        try { await ctx.close(); } catch (_) {}
-      }
-
-      frequencyData = null;
-      resetBandState();
-      pageHidden = false;
-      vibrationBusyUntil = 0;
-      navigator.vibrate?.(0);
-
-      for (const k of ["kick","snare","hihat"]) {
-        bars[k].style.width = "0%";
-        dots[k].classList.remove("active");
-      }
-
-      startButton.disabled = false;
-      stopButton.disabled  = true;
-      calibBtn.disabled    = true;
-      setStatus("Inactif.");
-      stopping = false;
-    }
-
-    // ─── START ───────────────────────────────────────────────────────────────────
-    async function start() {
-      if (running || starting || stopping) return;
-      const issue = envIssue();
-      if (issue) { setStatus(issue); return; }
-
-      try {
-        starting = true;
-        startButton.disabled = true;
-        setStatus("Demande micro…");
-
-        microphoneStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl:  false,
-          }
+            // Dessin Connexions
+            for (let j = i + 1; j < nodes.length; j++) {
+                const node2 = nodes[j];
+                const d = getDist(node, node2);
+                if (d < CONNECT_DIST) {
+                    canvasCtx.beginPath();
+                    canvasCtx.moveTo(node.x, node.y);
+                    canvasCtx.lineTo(node2.x, node2.y);
+                    const opacity = 1 - (d / CONNECT_DIST);
+                    canvasCtx.strokeStyle = `rgba(0, 242, 255, ${opacity * 0.5})`;
+                    canvasCtx.lineWidth = 0.8;
+                    canvasCtx.stroke();
+                }
+            }
         });
 
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        await audioContext.resume();
-
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.45; // réactif mais pas instable
-
-        inputGain = audioContext.createGain();
-        inputGain.gain.value = 1;
-
-        sourceNode = audioContext.createMediaStreamSource(microphoneStream);
-        sourceNode.connect(inputGain);
-        inputGain.connect(analyser);
-
-        frequencyData = new Uint8Array(analyser.frequencyBinCount);
-        resetBandState();
-        running = true;
-        stopButton.disabled = false;
-        calibBtn.disabled   = false;
-        setStatus("Actif — clique ⚡ Calibrer en silence !");
-        animationId = requestAnimationFrame(tick);
-
-      } catch (e) {
-        await stop();
-        setStatus(errMsg(e));
-      } finally {
-        starting = false;
-        if (!running) startButton.disabled = false;
-      }
+        canvasCtx.restore();
     }
 
-    // ─── EVENTS ──────────────────────────────────────────────────────────────────
-    startButton.addEventListener("click", start);
-    stopButton.addEventListener("click", stop);
-    calibBtn.addEventListener("click", calibrate);
+    // --- SETUP CAMERA & MEDIAPIPE ---
+    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.5
+    });
+    hands.onResults(onResults);s
 
-    document.addEventListener("visibilitychange", () => {
-      pageHidden = document.hidden;
-      if (pageHidden) {
-        vibrationBusyUntil = 0;
-        navigator.vibrate?.(0);
-      } else if (inputGain && audioContext) {
-        inputGain.gain.cancelScheduledValues(audioContext.currentTime);
-        inputGain.gain.setValueAtTime(1, audioContext.currentTime);
-      }
+    const camera = new Camera(videoElement, {
+        onFrame: async () => {
+            await hands.send({image: videoElement});
+        },
+        width: 1280,
+        height: 720
     });
 
-    window.addEventListener("beforeunload", () => {
-      navigator.vibrate?.(0);
-      microphoneStream?.getTracks().forEach(t => t.stop());
-    });
-  </script>
+    window.addEventListener('resize', initNodes);
+    initNodes();
+    camera.start();
+</script>
+
 </body>
 </html>
