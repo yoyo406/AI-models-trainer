@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>gpt.js</title>
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0d0d0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="gpt.js">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="msapplication-TileColor" content="#0d0d0d">
+<meta name="msapplication-TileImage" content="./icons/icon-192.png">
+<meta name="application-name" content="gpt.js">
+<meta name="description" content="Train a miniature GPT language model entirely in your browser.">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: #0d0d0d;
+  color: #d0d0d0;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 24px 20px 60px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ---- HEADER ---- */
+.hdr { margin-bottom: 36px; }
+.hdr h1 { color: #fff; font-size: 22px; letter-spacing: -0.5px; }
+.hdr p  { color: #444; font-size: 12px; margin-top: 4px; }
+
+/* ---- SECTION ---- */
+.sec { margin-bottom: 32px; }
+
+.sec-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #555;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sec-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #1e1e1e;
+}
+
+/* ---- TEXTAREA ---- */
+textarea {
+  width: 100%;
+  background: #111;
+  border: 1px solid #222;
+  color: #d0d0d0;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  padding: 14px;
+  resize: vertical;
+  min-height: 160px;
+  outline: none;
+  border-radius: 4px;
+  line-height: 1.7;
+}
+
+textarea:focus { border-color: #3a3a3a; }
+
+.upload-card {
+  margin-top: 12px;
+  background: #0f0f0f;
+  border: 1px solid #1f1f1f;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.drop-zone {
+  background: #101010;
+  border: 1px dashed #2a2a2a;
+  border-radius: 10px 10px 0 0;
+  color: #8a8a8a;
+  font-size: 12px;
+  padding: 18px 12px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.drop-zone:hover { border-color: #444; color: #b5b5b5; }
+.drop-zone.dragover {
+  border-color: #666;
+  color: #ededed;
+  background: #151515;
+}
+
+.upload-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  flex-wrap: wrap;
+}
+
+.upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #111;
+  color: #ddd;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.upload-btn:hover { border-color: #555; color: #fff; }
+
+.file-name {
+  min-width: 0;
+  flex: 1;
+  color: #777;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+input[type=file] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- PARAMS GRID ---- */
+.params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #555;
+}
+.field input {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 4px;
+  color: #d0d0d0;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  padding: 10px 12px;
+  outline: none;
+  width: 100%;
+}
+.field input:focus { border-color: #3a3a3a; }
+
+/* ---- BUTTONS ---- */
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+button {
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #aaa;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  padding: 12px 22px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  flex: 1;
+  min-width: 80px;
+}
+button:hover:not(:disabled) { border-color: #555; color: #fff; }
+button.primary { border-color: #666; color: #fff; }
+button.primary:hover:not(:disabled) { border-color: #999; }
+button:disabled { opacity: 0.25; cursor: not-allowed; }
+
+/* ---- CANVAS ---- */
+canvas {
+  display: block;
+  width: 100%;
+  height: 100px;
+  background: #111;
+  border: 1px solid #1e1e1e;
+  border-radius: 4px;
+}
+
+/* ---- PROGRESS ---- */
+.prog-wrap {
+  height: 2px;
+  background: #1a1a1a;
+  border-radius: 1px;
+  margin: 10px 0 14px;
+  overflow: hidden;
+}
+.prog-fill {
+  height: 100%;
+  width: 0%;
+  background: #888;
+  border-radius: 1px;
+  transition: width 0.4s;
+}
+
+/* ---- STATS ---- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.stat-box {
+  background: #111;
+  border: 1px solid #1e1e1e;
+  border-radius: 4px;
+  padding: 12px 14px;
+}
+.stat-box .lbl { font-size: 10px; color: #444; text-transform: uppercase; letter-spacing: 1px; }
+.stat-box .val { font-size: 17px; color: #d0d0d0; margin-top: 4px; }
+
+/* ---- OUTPUT ---- */
+.output-box {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 4px;
+  padding: 16px;
+  min-height: 100px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: #6dde6d;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.output-box.empty { color: #333; }
+
+/* ---- GEN CONTROLS ---- */
+.gen-controls {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 10px;
+  margin-top: 12px;
+  align-items: end;
+}
+@media (max-width: 480px) {
+  .gen-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .gen-controls button { grid-column: 1 / -1; }
+}
+
+.gen-controls input[type=text] {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 4px;
+  color: #d0d0d0;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  padding: 10px 12px;
+  outline: none;
+}
+.gen-controls input[type=text]:focus { border-color: #3a3a3a; }
+
+.temp-block { display: flex; flex-direction: column; gap: 6px; }
+.temp-block label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+.temp-row { display: flex; align-items: center; gap: 8px; }
+input[type=range] { accent-color: #888; cursor: pointer; width: 70px; }
+.temp-val { font-size: 13px; color: #888; min-width: 28px; }
+
+/* ---- LOG ---- */
+.log {
+  background: #111;
+  border: 1px solid #1a1a1a;
+  border-radius: 4px;
+  padding: 12px 14px;
+  height: 110px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #444;
+}
+.log .ok   { color: #3dba70; }
+.log .warn { color: #d07530; }
+.log .hi   { color: #888; }
+
+/* ---- DIVIDER ---- */
+.div { height: 1px; background: #1a1a1a; margin: 28px 0; }
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 480px) {
+  body { padding: 20px 16px 50px; font-size: 15px; }
+  .hdr h1 { font-size: 20px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  button { padding: 14px 18px; font-size: 14px; }
+  .field input { padding: 12px; font-size: 15px; }
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>gpt.js</h1>
+  <p>transformer decoder — char-level — adam optimizer — pure js</p>
+</div>
+
+<!-- DATA -->
+<div class="sec">
+  <div class="sec-title">data</div>
+  <textarea id="data">The quick brown fox jumps over the lazy dog.
+The moon shines in the starry night sky.
+The wind blows gently through the tree leaves.
+The black cat sleeps on the roof of the old house.
+The children play in the garden under the warm sun.
+The river flows slowly between the stones and the grass.
+The baker prepares warm bread early in the morning.
+The birds sing in the branches of the green trees.
+The sea is calm and blue under the clear sky.
+The sun sets behind the hills in the distance.
+The horse gallops across the meadow at sunset.
+The snow falls softly on the sleeping city.
+The old fisherman waits patiently on the edge of the lake.
+The stars shine in the dark night sky.
+The teacher explains the lesson to attentive students.
+The little girl reads a book in her quiet room.
+The cook prepares a delicious meal for the family.
+The white clouds float in the blue morning sky.
+The gardener waters the flowers under the fine rain.
+The old clock strikes midnight in the dark hallway.
+The train passes slowly over the gray stone bridge.
+The children laugh and run in the schoolyard.</textarea>
+
+  <div class="upload-card">
+    <div class="drop-zone" id="dropZone">Drop a .txt file here or click to choose</div>
+    <div class="upload-row">
+      <label class="upload-btn" for="txtFile">Choose a file</label>
+      <span class="file-name" id="fileName">No file chosen</span>
+    </div>
+    <input type="file" id="txtFile" accept=".txt,text/plain">
+  </div>
+
+</div>
+
+<!-- HYPERPARAMETERS -->
+<div class="sec">
+  <div class="sec-title">hyperparameters</div>
+  <div class="params-grid">
+    <div class="field"><label>ctx len</label><input type="number" id="blockSize" value="24" min="8" max="64"></div>
+    <div class="field"><label>n_embd</label><input type="number" id="nEmbd" value="48" min="16" max="256" step="8"></div>
+    <div class="field"><label>n_heads</label><input type="number" id="nHeads" value="4" min="1" max="8"></div>
+    <div class="field"><label>n_layers</label><input type="number" id="nLayers" value="2" min="1" max="6"></div>
+    <div class="field"><label>epochs</label><input type="number" id="epochs" value="1000" min="100" max="10000" step="100"></div>
+    <div class="field"><label>batch</label><input type="number" id="batch" value="12" min="2" max="64"></div>
+    <div class="field"><label>lr</label><input type="number" id="lr" value="0.001" step="0.0005" min="0.00001"></div>
+    <div class="field"><label>dropout</label><input type="number" id="dropout" value="0.1" step="0.05" min="0" max="0.5"></div>
+  </div>
+  <div class="btns">
+    <button class="primary" id="btnTrain">▶ train</button>
+    <button id="btnStop" disabled>■ stop</button>
+    <button id="btnReset">↺ reset</button>
+  </div>
+</div>
+
+<!-- TRAINING VIZ -->
+<div class="sec">
+  <div class="sec-title">training</div>
+  <canvas id="cvs"></canvas>
+  <div class="prog-wrap"><div class="prog-fill" id="pbar"></div></div>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="lbl">vocab</div><div class="val" id="sVocab">--</div></div>
+    <div class="stat-box"><div class="lbl">params</div><div class="val" id="sParams">--</div></div>
+    <div class="stat-box"><div class="lbl">epoch</div><div class="val" id="sEpoch">0</div></div>
+    <div class="stat-box"><div class="lbl">loss</div><div class="val" id="sLoss">--</div></div>
+  </div>
+</div>
+
+<div class="div"></div>
+
+<!-- OUTPUT -->
+<div class="sec">
+  <div class="sec-title">generation</div>
+  <div class="output-box empty" id="output">-- train the model first --</div>
+  <div class="gen-controls">
+    <input type="text" id="seed" value="Le " placeholder="seed...">
+    <div class="field"><label>len</label><input type="number" id="genLen" value="150" min="20" max="800" style="width:75px"></div>
+    <div class="temp-block">
+      <label>temp</label>
+      <div class="temp-row">
+        <input type="range" id="tempR" min="0.1" max="2.0" step="0.1" value="0.8">
+        <span class="temp-val" id="tempV">0.8</span>
+      </div>
+    </div>
+    <button id="btnGen" disabled>generate</button>
+  </div>
+</div>
+
+<!-- MODEL -->
+<div class="sec">
+  <div class="sec-title">model</div>
+  <div class="btns">
+    <button id="btnExportModel">⬇ export .json</button>
+    <button id="btnImportModel">⬆ import .json</button>
+    <button id="btnClearModel">✕ clear model</button>
+  </div>
+  <input type="file" id="modelFile" accept="application/json,.json" style="display:none">
+  <div style="margin-top:10px;color:#666;font-size:12px;line-height:1.6">
+    Exports a portable checkpoint. Real GGUF is not supported here, because this JS model is not a disguised Llama.
+  </div>
+</div>
+
+<!-- LOG -->
+<div class="sec">
+  <div class="sec-title">log</div>
+  <div class="log" id="log"><span class="hi">ready.</span></div>
+</div>
+
+<script>
+// =============================================================================
+// MATH UTILS
+// =============================================================================
+function addVec(a, b) {
+  var r = new Float32Array(a.length);
+  for (var i = 0; i < a.length; i++) r[i] = a[i] + b[i];
+  return r;
+}
+
+function scaleVec(a, s) {
+  var r = new Float32Array(a.length);
+  for (var i = 0; i < a.length; i++) r[i] = a[i] * s;
+  return r;
+}
+
+// Softmax with temperature
+function softmax(x, T) {
+  T = T || 1.0;
+  var mx = x[0];
+  for (var i = 1; i < x.length; i++) if (x[i] > mx) mx = x[i];
+  var s = 0;
+  var e = new Float32Array(x.length);
+  for (var i = 0; i < x.length; i++) { e[i] = Math.exp(x[i] / T - mx / T); s += e[i]; }
+  for (var i = 0; i < x.length; i++) e[i] /= s;
+  return e;
+}
+
+// LayerNorm forward — retourne {out, mu, sigma} pour backprop
+function layerNormFwd(x, g, b) {
+  var n = x.length, mu = 0, vr = 0;
+  for (var i = 0; i < n; i++) mu += x[i];
+  mu /= n;
+  for (var i = 0; i < n; i++) vr += (x[i] - mu) * (x[i] - mu);
+  vr = vr / n + 1e-5;
+  var sd = Math.sqrt(vr);
+  var xhat = new Float32Array(n);
+  var out = new Float32Array(n);
+  for (var i = 0; i < n; i++) { xhat[i] = (x[i] - mu) / sd; out[i] = g[i] * xhat[i] + b[i]; }
+  return { out: out, xhat: xhat, sd: sd };
+}
+
+// LayerNorm backward — retourne dX, dG, dB
+function layerNormBwd(dOut, xhat, sd, g) {
+  var n = dOut.length;
+  var dxhat = new Float32Array(n);
+  var dg = new Float32Array(n);
+  var db = new Float32Array(n);
+  for (var i = 0; i < n; i++) { dxhat[i] = dOut[i] * g[i]; dg[i] = dOut[i] * xhat[i]; db[i] = dOut[i]; }
+  // dx from xhat: dx = (1/sd)*(dxhat - mean(dxhat) - xhat*mean(dxhat*xhat))
+  var mdxhat = 0, mdxhatx = 0;
+  for (var i = 0; i < n; i++) { mdxhat += dxhat[i]; mdxhatx += dxhat[i] * xhat[i]; }
+  mdxhat /= n; mdxhatx /= n;
+  var dx = new Float32Array(n);
+  for (var i = 0; i < n; i++) dx[i] = (dxhat[i] - mdxhat - xhat[i] * mdxhatx) / sd;
+  return { dx: dx, dg: dg, db: db };
+}
+
+// GELU forward
+function geluFwd(x) {
+  var r = new Float32Array(x.length);
+  for (var i = 0; i < x.length; i++) {
+    var v = x[i];
+    r[i] = 0.5 * v * (1 + Math.tanh(0.7978845608 * (v + 0.044715 * v * v * v)));
+  }
+  return r;
+}
+
+// GELU backward
+function geluBwd(dOut, x) {
+  var r = new Float32Array(x.length);
+  for (var i = 0; i < x.length; i++) {
+    var v = x[i];
+    var t = Math.tanh(0.7978845608 * (v + 0.044715 * v * v * v));
+    var dt = 0.7978845608 * (1 + 3 * 0.044715 * v * v);
+    r[i] = dOut[i] * (0.5 * (1 + t) + 0.5 * v * (1 - t * t) * dt);
+  }
+  return r;
+}
+
+function randMat(rows, cols, scale) {
+  var m = [];
+  for (var i = 0; i < rows; i++) {
+    var row = new Float32Array(cols);
+    for (var j = 0; j < cols; j++) row[j] = (Math.random() * 2 - 1) * scale;
+    m.push(row);
+  }
+  return m;
+}
+
+function zeroLike(mat) {
+  var r = [];
+  for (var i = 0; i < mat.length; i++) r.push(new Float32Array(mat[i].length));
+  return r;
+}
+
+function clipV(v, t) { return v > t ? t : v < -t ? -t : v; }
+
+function dropout(x, rate, training) {
+  if (!training || rate <= 0) return { out: x, mask: null };
+  var mask = new Float32Array(x.length);
+  var out  = new Float32Array(x.length);
+  var scale = 1.0 / (1.0 - rate);
+  for (var i = 0; i < x.length; i++) {
+    mask[i] = Math.random() > rate ? 1 : 0;
+    out[i]  = x[i] * mask[i] * scale;
+  }
+  return { out: out, mask: mask };
+}
+
+function dropoutBwd(dOut, mask, rate) {
+  if (!mask) return dOut;
+  var scale = 1.0 / (1.0 - rate);
+  var r = new Float32Array(dOut.length);
+  for (var i = 0; i < dOut.length; i++) r[i] = dOut[i] * mask[i] * scale;
+  return r;
+}
+
+// =============================================================================
+// ADAM OPTIMIZER
+// =============================================================================
+function Adam(lr, beta1, beta2, weightDecay) {
+  this.lr = lr || 0.001;
+  this.b1 = beta1 || 0.9;
+  this.b2 = beta2 || 0.999;
+  this.wd = weightDecay || 0.01;
+  this.t  = 0;
+  this.state = {}; // keyed by param id
+}
+
+Adam.prototype.step = function(params) {
+  // params: array of {id, data, grad}  where data/grad are Float32Array or array-of-Float32Array
+  this.t++;
+  var bc1 = 1 - Math.pow(this.b1, this.t);
+  var bc2 = 1 - Math.pow(this.b2, this.t);
+  for (var pi = 0; pi < params.length; pi++) {
+    var p = params[pi];
+    if (!this.state[p.id]) this.state[p.id] = { m: null, v: null };
+    var st = this.state[p.id];
+    var isMatrix = Array.isArray(p.data);
+    if (isMatrix) {
+      if (!st.m) { st.m = zeroLike(p.data); st.v = zeroLike(p.data); }
+      for (var i = 0; i < p.data.length; i++) {
+        for (var j = 0; j < p.data[i].length; j++) {
+          var g = clipV(p.grad[i][j], 5.0);
+          st.m[i][j] = this.b1 * st.m[i][j] + (1 - this.b1) * g;
+          st.v[i][j] = this.b2 * st.v[i][j] + (1 - this.b2) * g * g;
+          var mhat = st.m[i][j] / bc1;
+          var vhat = st.v[i][j] / bc2;
+          p.data[i][j] -= this.lr * (mhat / (Math.sqrt(vhat) + 1e-8) + this.wd * p.data[i][j]);
+        }
+      }
+    } else {
+      if (!st.m) { st.m = new Float32Array(p.data.length); st.v = new Float32Array(p.data.length); }
+      for (var i = 0; i < p.data.length; i++) {
+        var g = clipV(p.grad[i], 5.0);
+        st.m[i] = this.b1 * st.m[i] + (1 - this.b1) * g;
+        st.v[i] = this.b2 * st.v[i] + (1 - this.b2) * g * g;
+        var mhat = st.m[i] / bc1;
+        var vhat = st.v[i] / bc2;
+        p.data[i] -= this.lr * (mhat / (Math.sqrt(vhat) + 1e-8) + this.wd * p.data[i]);
+      }
+    }
+  }
+};
+
+// =============================================================================
+// MINI GPT — Transformer decoder with real backpropagation
+// =============================================================================
+function MiniGPT(vocabSize, blockSize, nEmbd, nHeads, nLayers, dropoutRate, lr) {
+  this.V  = vocabSize;
+  this.T  = blockSize;
+  this.C  = nEmbd;
+  this.H  = nHeads;
+  this.L  = nLayers;
+  this.dr = dropoutRate || 0.1;
+  this.hd = Math.floor(nEmbd / nHeads); // head dimension
+
+  var s = function(fanIn) { return Math.sqrt(2.0 / fanIn); };
+
+  // Token + positional embeddings
+  this.wte = randMat(vocabSize, nEmbd, s(nEmbd));
+  this.wpe = randMat(blockSize, nEmbd, s(nEmbd));
+
+  // Blocks
+  this.blocks = [];
+  for (var l = 0; l < nLayers; l++) {
+    this.blocks.push({
+      // Attention LN
+      ln1g: new Float32Array(nEmbd).fill(1.0),
+      ln1b: new Float32Array(nEmbd),
+      // Attention projections
+      Wq: randMat(nEmbd, nEmbd, s(nEmbd)),
+      Wk: randMat(nEmbd, nEmbd, s(nEmbd)),
+      Wv: randMat(nEmbd, nEmbd, s(nEmbd)),
+      Wo: randMat(nEmbd, nEmbd, s(nEmbd)),
+      bo: new Float32Array(nEmbd),
+      // FFN LN
+      ln2g: new Float32Array(nEmbd).fill(1.0),
+      ln2b: new Float32Array(nEmbd),
+      // FFN
+      Wf1: randMat(4 * nEmbd, nEmbd, s(nEmbd)),
+      bf1: new Float32Array(4 * nEmbd),
+      Wf2: randMat(nEmbd, 4 * nEmbd, s(4 * nEmbd)),
+      bf2: new Float32Array(nEmbd)
+    });
+  }
+
+  // Final LN + head
+  this.lnFg = new Float32Array(nEmbd).fill(1.0);
+  this.lnFb = new Float32Array(nEmbd);
+  this.head  = randMat(vocabSize, nEmbd, s(nEmbd));
+  this.bhead = new Float32Array(vocabSize);
+
+  // Adam optimizer
+  this.opt = new Adam(lr || 0.001, 0.9, 0.999, 0.01);
+}
+
+// ---- FORWARD ----
+MiniGPT.prototype.forward = function(tokens, isTraining) {
+  var C = this.C, H = this.H, hd = this.hd, T = tokens.length, V = this.V;
+  var dr = isTraining ? this.dr : 0;
+
+  // Cache for backprop
+  var cache = { tokens: tokens, blocks: [], lnF: null, xf: null };
+
+  // Input embeddings
+  var x = [];
+  for (var t = 0; t < T; t++) x.push(addVec(this.wte[tokens[t]], this.wpe[t]));
+
+  // Transformer blocks
+  for (var l = 0; l < this.L; l++) {
+    var b = this.blocks[l];
+    var bc = { ln1: [], Q: [], K: [], Vmat: [], attnW: [], attnOut: [], dropAttn: [], proj: [], dropProj: [], resid1: [], ln2: [], ff1pre: [], ff1: [], ff2pre: [], ff2: [], dropFF: [], resid2: [] };
+
+    // LN1
+    var xln1 = [];
+    for (var t = 0; t < T; t++) { var ln = layerNormFwd(x[t], b.ln1g, b.ln1b); xln1.push(ln.out); bc.ln1.push(ln); }
+
+    // Q K V
+    var Q = [], K = [], Vmat = [];
+    for (var t = 0; t < T; t++) {
+      var q = new Float32Array(C), k2 = new Float32Array(C), v2 = new Float32Array(C);
+      for (var i = 0; i < C; i++) for (var j = 0; j < C; j++) { q[i] += b.Wq[i][j] * xln1[t][j]; k2[i] += b.Wk[i][j] * xln1[t][j]; v2[i] += b.Wv[i][j] * xln1[t][j]; }
+      Q.push(q); K.push(k2); Vmat.push(v2);
+    }
+    bc.Q = Q; bc.K = K; bc.Vmat = Vmat; bc.xln1 = xln1;
+
+    // Multi-head causal attention
+    var attnWeights = []; // [T][T] per head -> averaged for cache
+    var attnOut = [];
+    for (var t = 0; t < T; t++) attnOut.push(new Float32Array(C));
+
+    var allHeadWeights = [];
+    for (var h = 0; h < H; h++) {
+      var hs = h * hd;
+      var headW = [];
+      for (var i = 0; i < T; i++) {
+        var scores = new Float32Array(T);
+        for (var j = 0; j <= i; j++) {
+          var dot = 0;
+          for (var d = 0; d < hd; d++) dot += Q[i][hs + d] * K[j][hs + d];
+          scores[j] = dot / Math.sqrt(hd);
+        }
+        for (var j = i + 1; j < T; j++) scores[j] = -1e9;
+        var w = softmax(scores);
+        headW.push(w);
+        for (var d = 0; d < hd; d++) {
+          var agg = 0;
+          for (var j = 0; j < T; j++) agg += w[j] * Vmat[j][hs + d];
+          attnOut[i][hs + d] = agg;
+        }
+      }
+      allHeadWeights.push(headW);
+    }
+    bc.attnW = allHeadWeights;
+    bc.attnOut = attnOut;
+
+    // Dropout on attn
+    var attnDropped = [];
+    var attnMasks = [];
+    for (var t = 0; t < T; t++) {
+      var d2 = dropout(attnOut[t], dr, isTraining);
+      attnDropped.push(d2.out); attnMasks.push(d2.mask);
+    }
+    bc.attnDropped = attnDropped; bc.attnMasks = attnMasks;
+
+    // Output projection + bias
+    var proj = [];
+    for (var t = 0; t < T; t++) {
+      var p = new Float32Array(C);
+      for (var i = 0; i < C; i++) { p[i] = b.bo[i]; for (var j = 0; j < C; j++) p[i] += b.Wo[i][j] * attnDropped[t][j]; }
+      proj.push(p);
+    }
+    bc.proj = proj;
+
+    // Residual 1
+    var resid1 = [];
+    for (var t = 0; t < T; t++) resid1.push(addVec(x[t], proj[t]));
+    bc.resid1 = resid1;
+
+    // LN2
+    var xln2 = [];
+    for (var t = 0; t < T; t++) { var ln2 = layerNormFwd(resid1[t], b.ln2g, b.ln2b); xln2.push(ln2.out); bc.ln2.push(ln2); }
+    bc.xln2 = xln2;
+
+    // FFN
+    var ff2out = [];
+    var ff1pre_all = [], ff1_all = [], ff2pre_all = [];
+    for (var t = 0; t < T; t++) {
+      var ff1pre = new Float32Array(4 * C);
+      for (var i = 0; i < 4 * C; i++) { ff1pre[i] = b.bf1[i]; for (var j = 0; j < C; j++) ff1pre[i] += b.Wf1[i][j] * xln2[t][j]; }
+      var ff1out = geluFwd(ff1pre);
+      var ff2pre = new Float32Array(C);
+      for (var i = 0; i < C; i++) { ff2pre[i] = b.bf2[i]; for (var j = 0; j < 4 * C; j++) ff2pre[i] += b.Wf2[i][j] * ff1out[j]; }
+      ff1pre_all.push(ff1pre); ff1_all.push(ff1out); ff2pre_all.push(ff2pre);
+      ff2out.push(ff2pre);
+    }
+    bc.ff1pre = ff1pre_all; bc.ff1 = ff1_all; bc.ff2pre = ff2pre_all;
+
+    // Dropout on FFN
+    var ffDropped = [], ffMasks = [];
+    for (var t = 0; t < T; t++) {
+      var dd = dropout(ff2out[t], dr, isTraining);
+      ffDropped.push(dd.out); ffMasks.push(dd.mask);
+    }
+    bc.ffDropped = ffDropped; bc.ffMasks = ffMasks;
+
+    // Residual 2
+    var resid2 = [];
+    for (var t = 0; t < T; t++) resid2.push(addVec(resid1[t], ffDropped[t]));
+    bc.resid2 = resid2;
+
+    x = resid2;
+    cache.blocks.push(bc);
+  }
+
+  // Final LN
+  var xfList = [], lnFList = [];
+  for (var t = 0; t < T; t++) {
+    var lnF = layerNormFwd(x[t], this.lnFg, this.lnFb);
+    xfList.push(lnF.out); lnFList.push(lnF);
+  }
+  cache.lnF = lnFList; cache.xf = xfList; cache.x = x;
+
+  // Logits
+  var logits = [];
+  for (var t = 0; t < T; t++) {
+    var logit = new Float32Array(V);
+    for (var i = 0; i < V; i++) { logit[i] = this.bhead[i]; for (var j = 0; j < C; j++) logit[i] += this.head[i][j] * xfList[t][j]; }
+    logits.push(logit);
+  }
+  cache.logits = logits;
+
+  return cache;
+};
+
+// ---- BACKWARD + UPDATE ----
+MiniGPT.prototype.backward = function(cache, targets) {
+  var T = targets.length, C = this.C, V = this.V, H = this.H, hd = this.hd;
+  var tokens = cache.tokens;
+
+  // Softmax + cross-entropy gradient
+  var probs = cache.logits.map(function(l) { return softmax(l); });
+  var loss = 0;
+  for (var t = 0; t < T; t++) loss -= Math.log(probs[t][targets[t]] + 1e-8);
+  loss /= T;
+
+  // dL/dlogits
+  var dLogits = [];
+  for (var t = 0; t < T; t++) {
+    var d = new Float32Array(probs[t].length);
+    for (var i = 0; i < d.length; i++) d[i] = probs[t][i] / T;
+    d[targets[t]] -= 1.0 / T;
+    dLogits.push(d);
+  }
+
+  // Accumulate gradients
+  var dHead  = zeroLike(this.head);
+  var dBhead = new Float32Array(V);
+  var dLnFg  = new Float32Array(C);
+  var dLnFb  = new Float32Array(C);
+  var dWte   = zeroLike(this.wte);
+  var dWpe   = zeroLike(this.wpe);
+
+  var dBlockParams = this.blocks.map(function(b) {
+    return {
+      dln1g: new Float32Array(C), dln1b: new Float32Array(C),
+      dln2g: new Float32Array(C), dln2b: new Float32Array(C),
+      dWq: zeroLike(b.Wq), dWk: zeroLike(b.Wk), dWv: zeroLike(b.Wv),
+      dWo: zeroLike(b.Wo), dbo: new Float32Array(C),
+      dWf1: zeroLike(b.Wf1), dbf1: new Float32Array(4 * C),
+      dWf2: zeroLike(b.Wf2), dbf2: new Float32Array(C)
+    };
+  });
+
+  // Grad through head + final LN
+  var dX = [];
+  for (var t = 0; t < T; t++) {
+    // dhead, dbhead
+    for (var i = 0; i < V; i++) {
+      dBhead[i] += dLogits[t][i];
+      for (var j = 0; j < C; j++) dHead[i][j] += dLogits[t][i] * cache.xf[t][j];
+    }
+    // dxf
+    var dxf = new Float32Array(C);
+    for (var j = 0; j < C; j++) for (var i = 0; i < V; i++) dxf[j] += this.head[i][j] * dLogits[t][i];
+    // through LN_final
+    var lnBwd = layerNormBwd(dxf, cache.lnF[t].xhat, cache.lnF[t].sd, this.lnFg);
+    for (var i = 0; i < C; i++) { dLnFg[i] += lnBwd.dg[i]; dLnFb[i] += lnBwd.db[i]; }
+    dX.push(lnBwd.dx);
+  }
+
+  // Grad through transformer blocks (reverse)
+  for (var l = this.L - 1; l >= 0; l--) {
+    var b  = this.blocks[l];
+    var bc = cache.blocks[l];
+    var dp = dBlockParams[l];
+
+    var dRes1All = [];
+    var dXln1All = [];
+    var dQAll = [];
+    var dKAll = [];
+    var dVAll = [];
+    for (var p = 0; p < T; p++) {
+      dRes1All.push(new Float32Array(C));
+      dXln1All.push(new Float32Array(C));
+      dQAll.push(new Float32Array(C));
+      dKAll.push(new Float32Array(C));
+      dVAll.push(new Float32Array(C));
+    }
+
+    for (var t = 0; t < T; t++) {
+      // Residual 2: dX[t] flows to both resid1 and ffn dropout
+      var dFF = dropoutBwd(dX[t], bc.ffMasks[t], this.dr);
+
+      // FFN backward
+      var dff2pre = dFF;
+      for (var i = 0; i < C; i++) {
+        dp.dbf2[i] += dff2pre[i];
+        for (var j = 0; j < 4 * C; j++) dp.dWf2[i][j] += dff2pre[i] * bc.ff1[t][j];
+      }
+      var dff1 = new Float32Array(4 * C);
+      for (var j = 0; j < 4 * C; j++) for (var i = 0; i < C; i++) dff1[j] += b.Wf2[i][j] * dff2pre[i];
+
+      var dff1pre = geluBwd(dff1, bc.ff1pre[t]);
+      for (var i = 0; i < 4 * C; i++) {
+        dp.dbf1[i] += dff1pre[i];
+        for (var j = 0; j < C; j++) dp.dWf1[i][j] += dff1pre[i] * bc.xln2[t][j];
+      }
+      var dxln2 = new Float32Array(C);
+      for (var j = 0; j < C; j++) for (var i = 0; i < 4 * C; i++) dxln2[j] += b.Wf1[i][j] * dff1pre[i];
+
+      // LN2
+      var dln2 = layerNormBwd(dxln2, bc.ln2[t].xhat, bc.ln2[t].sd, b.ln2g);
+      for (var i = 0; i < C; i++) { dp.dln2g[i] += dln2.dg[i]; dp.dln2b[i] += dln2.db[i]; }
+
+      // Gradient to resid1 for this token
+      var dResid1 = new Float32Array(C);
+      for (var i = 0; i < C; i++) {
+        dResid1[i] = dX[t][i] + dln2.dx[i];
+      }
+      dRes1All[t] = dResid1;
+
+      // Attention output projection
+      for (var i = 0; i < C; i++) {
+        dp.dbo[i] += dResid1[i];
+        for (var j = 0; j < C; j++) dp.dWo[i][j] += dResid1[i] * bc.attnDropped[t][j];
+      }
+      var dAttnDropped = new Float32Array(C);
+      for (var j = 0; j < C; j++) for (var i = 0; i < C; i++) dAttnDropped[j] += b.Wo[i][j] * dResid1[i];
+      var dAttnOut_t = dropoutBwd(dAttnDropped, bc.attnMasks[t], this.dr);
+
+      // Attention backward: accumulate dQ, dK, dV for all source positions
+      for (var h = 0; h < H; h++) {
+        var hs = h * hd;
+        var w = bc.attnW[h][t];
+
+        var scoreGrad = new Float32Array(t + 1);
+        var dotWG = 0;
+
+        for (var j = 0; j <= t; j++) {
+          var g = 0;
+          for (var d = 0; d < hd; d++) {
+            var od = dAttnOut_t[hs + d];
+            var vv = bc.Vmat[j][hs + d];
+            g += od * vv;
+            dVAll[j][hs + d] += w[j] * od;
+          }
+          scoreGrad[j] = g;
+          dotWG += w[j] * g;
+        }
+
+        var scale = 1.0 / Math.sqrt(hd);
+        for (var j = 0; j <= t; j++) {
+          var ds = w[j] * (scoreGrad[j] - dotWG) * scale;
+          for (var d = 0; d < hd; d++) {
+            dQAll[t][hs + d] += ds * bc.K[j][hs + d];
+            dKAll[j][hs + d] += ds * bc.Q[t][hs + d];
+          }
+        }
+      }
+    }
+
+    // Backprop through Q/K/V projections for the whole block
+    for (var p = 0; p < T; p++) {
+      for (var i = 0; i < C; i++) {
+        var dq = dQAll[p][i];
+        var dk = dKAll[p][i];
+        var dv = dVAll[p][i];
+
+        if (dq !== 0) {
+          for (var j = 0; j < C; j++) {
+            dp.dWq[i][j] += dq * bc.xln1[p][j];
+            dXln1All[p][j] += b.Wq[i][j] * dq;
+          }
+        }
+        if (dk !== 0) {
+          for (var j = 0; j < C; j++) {
+            dp.dWk[i][j] += dk * bc.xln1[p][j];
+            dXln1All[p][j] += b.Wk[i][j] * dk;
+          }
+        }
+        if (dv !== 0) {
+          for (var j = 0; j < C; j++) {
+            dp.dWv[i][j] += dv * bc.xln1[p][j];
+            dXln1All[p][j] += b.Wv[i][j] * dv;
+          }
+        }
+      }
+
+      // LN1 backward + residual skip
+      var dLn1 = layerNormBwd(dXln1All[p], bc.ln1[p].xhat, bc.ln1[p].sd, b.ln1g);
+      for (var i = 0; i < C; i++) { dp.dln1g[i] += dLn1.dg[i]; dp.dln1b[i] += dLn1.db[i]; }
+
+      dX[p] = new Float32Array(C);
+      for (var i = 0; i < C; i++) {
+        dX[p][i] = dRes1All[p][i] + dLn1.dx[i];
+      }
+
+      // Embedding gradients
+      var tok = tokens[p];
+      for (var i = 0; i < C; i++) {
+        dWte[tok][i] += dX[p][i];
+        dWpe[p][i]   += dX[p][i];
+      }
+    }
+  }
+
+  // Collect all params + grads for Adam
+  var params = [
+    { id: 'wte',   data: this.wte,   grad: dWte  },
+    { id: 'wpe',   data: this.wpe,   grad: dWpe  },
+    { id: 'lnFg',  data: this.lnFg,  grad: dLnFg },
+    { id: 'lnFb',  data: this.lnFb,  grad: dLnFb },
+    { id: 'head',  data: this.head,  grad: dHead },
+    { id: 'bhead', data: this.bhead, grad: dBhead }
+  ];
+  for (var l = 0; l < this.L; l++) {
+    var b = this.blocks[l], dp = dBlockParams[l];
+    var pfx = 'b' + l + '_';
+    params.push(
+      { id: pfx+'Wq',   data: b.Wq,   grad: dp.dWq   },
+      { id: pfx+'Wk',   data: b.Wk,   grad: dp.dWk   },
+      { id: pfx+'Wv',   data: b.Wv,   grad: dp.dWv   },
+      { id: pfx+'Wo',   data: b.Wo,   grad: dp.dWo   },
+      { id: pfx+'bo',   data: b.bo,   grad: dp.dbo   },
+      { id: pfx+'Wf1',  data: b.Wf1,  grad: dp.dWf1  },
+      { id: pfx+'bf1',  data: b.bf1,  grad: dp.dbf1  },
+      { id: pfx+'Wf2',  data: b.Wf2,  grad: dp.dWf2  },
+      { id: pfx+'bf2',  data: b.bf2,  grad: dp.dbf2  },
+      { id: pfx+'ln1g', data: b.ln1g, grad: dp.dln1g },
+      { id: pfx+'ln1b', data: b.ln1b, grad: dp.dln1b },
+      { id: pfx+'ln2g', data: b.ln2g, grad: dp.dln2g },
+      { id: pfx+'ln2b', data: b.ln2b, grad: dp.dln2b }
+    );
+  }
+
+  this.opt.step(params);
+  return loss;
+};
+
+MiniGPT.prototype.trainStep = function(tokens, targets) {
+  var cache = this.forward(tokens, true);
+  return this.backward(cache, targets);
+};
+
+MiniGPT.prototype.generate = function(seedStr, maxNew, charToIdx, idxToChar, temp) {
+  var ctx = [];
+  for (var i = 0; i < seedStr.length; i++) {
+    var c = seedStr[i];
+    ctx.push(charToIdx.hasOwnProperty(c) ? charToIdx[c] : 0);
+  }
+  var result = seedStr;
+  for (var n = 0; n < maxNew; n++) {
+    var trimmed = ctx.length > this.T ? ctx.slice(ctx.length - this.T) : ctx.slice();
+    var cache = this.forward(trimmed, false);
+    var lastLogits = Array.from(cache.logits[trimmed.length - 1]);
+    var probs = softmax(lastLogits, temp);
+    var r = Math.random(), cum = 0, chosen = 0;
+    for (var k = 0; k < probs.length; k++) { cum += probs[k]; if (r < cum) { chosen = k; break; } }
+    ctx.push(chosen);
+    result += idxToChar[chosen];
+  }
+  return result;
+};
+
+MiniGPT.prototype.countParams = function() {
+  var C = this.C;
+  return this.V * C + this.T * C +
+    this.L * (4 * C * C + 4 * C * C + 4 * C * (4 * C) + C + 4 * C + C + 4 * C) +
+    this.V * C + this.V + 2 * C;
+};
+
+// =============================================================================
+// APP STATE
+// =============================================================================
+var gpt = null;
+var charToIdx = {}, idxToChar = {}, vocab = [];
+var lossHist = [];
+var training = false, handle = null;
+
+// =============================================================================
+// UI
+// =============================================================================
+function addLog(msg, cls) {
+  var el = document.getElementById('log');
+  var span = document.createElement('span');
+  span.className = cls || 'hi';
+  span.textContent = msg;
+  el.appendChild(document.createTextNode('\n'));
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+}
+
+function drawLoss() {
+  var cvs = document.getElementById('cvs');
+  var ctx = cvs.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var W = cvs.width  = cvs.offsetWidth * dpr;
+  var H = cvs.height = 100 * dpr;
+  ctx.clearRect(0, 0, W, H);
+  if (lossHist.length < 2) return;
+  var pad = 10 * dpr;
+  var mx = lossHist[0], mn = lossHist[0];
+  for (var i = 1; i < lossHist.length; i++) {
+    if (lossHist[i] > mx) mx = lossHist[i];
+    if (lossHist[i] < mn) mn = lossHist[i];
+  }
+  var rng = mx - mn || 1;
+  // Fill
+  ctx.beginPath();
+  for (var i = 0; i < lossHist.length; i++) {
+    var x = pad + (i / (lossHist.length - 1)) * (W - pad * 2);
+    var y = pad + (1 - (lossHist[i] - mn) / rng) * (H - pad * 2);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5 * dpr; ctx.stroke();
+  // Label
+  ctx.fillStyle = '#555'; ctx.font = (9 * dpr) + 'px Courier New';
+  ctx.fillText('loss: ' + lossHist[lossHist.length - 1].toFixed(4), pad + 4, pad + 12 * dpr);
+  var minStr = 'min: ' + mn.toFixed(4);
+  ctx.fillText(minStr, W - pad - ctx.measureText(minStr).width - 4, H - pad - 4);
+}
+
+function fmtNum(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+  return '' + n;
+}
+
+function setDataText(text, fileName) {
+  document.getElementById('data').value = text;
+  document.getElementById('fileName').textContent = fileName || 'No file chosen';
+  buildVocab();
+  addLog('txt loaded: ' + (fileName || 'file'), 'ok');
+}
+
+function loadTxtFile(file) {
+  if (!file) return;
+  if (!/\.txt$/i.test(file.name) && file.type && file.type !== 'text/plain') {
+    addLog('rejected format: .txt only.', 'warn');
+    return;
+  }
+  document.getElementById('fileName').textContent = file.name;
+  var reader = new FileReader();
+  reader.onload = function () {
+    var text = String(reader.result || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    setDataText(text, file.name);
+  };
+  reader.onerror = function () {
+    addLog('unable to read the file.', 'warn');
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function toPlainMatrix(mat) {
+  var out = new Array(mat.length);
+  for (var i = 0; i < mat.length; i++) out[i] = Array.from(mat[i]);
+  return out;
+}
+
+function fromPlainMatrix(src, rows, cols) {
+  if (!Array.isArray(src) || src.length !== rows) return null;
+  var out = new Array(rows);
+  for (var i = 0; i < rows; i++) {
+    if (!Array.isArray(src[i]) || src[i].length !== cols) return null;
+    out[i] = new Float32Array(cols);
+    for (var j = 0; j < cols; j++) out[i][j] = Number(src[i][j]) || 0;
+  }
+  return out;
+}
+
+function toPlainArray(arr) {
+  return Array.prototype.slice.call(arr);
+}
+
+function downloadText(filename, text) {
+  var blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () {
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }, 0);
+}
+
+function serializeModel() {
+  if (!gpt) return null;
+  var blocks = [];
+  for (var l = 0; l < gpt.L; l++) {
+    var b = gpt.blocks[l];
+    blocks.push({
+      ln1g: toPlainArray(b.ln1g),
+      ln1b: toPlainArray(b.ln1b),
+      Wq: toPlainMatrix(b.Wq),
+      Wk: toPlainMatrix(b.Wk),
+      Wv: toPlainMatrix(b.Wv),
+      Wo: toPlainMatrix(b.Wo),
+      bo: toPlainArray(b.bo),
+      ln2g: toPlainArray(b.ln2g),
+      ln2b: toPlainArray(b.ln2b),
+      Wf1: toPlainMatrix(b.Wf1),
+      bf1: toPlainArray(b.bf1),
+      Wf2: toPlainMatrix(b.Wf2),
+      bf2: toPlainArray(b.bf2)
+    });
+  }
+  return {
+    format: 'gpt.js-checkpoint-v1',
+    createdAt: new Date().toISOString(),
+    vocab: vocab.slice(),
+    config: {
+      V: gpt.V,
+      T: gpt.T,
+      C: gpt.C,
+      H: gpt.H,
+      L: gpt.L,
+      dr: gpt.dr,
+      lr: gpt.opt ? gpt.opt.lr : 0.001
+    },
+    state: {
+      wte: toPlainMatrix(gpt.wte),
+      wpe: toPlainMatrix(gpt.wpe),
+      blocks: blocks,
+      lnFg: toPlainArray(gpt.lnFg),
+      lnFb: toPlainArray(gpt.lnFb),
+      head: toPlainMatrix(gpt.head),
+      bhead: toPlainArray(gpt.bhead)
+    },
+    ui: {
+      dataText: document.getElementById('data').value,
+      seed: document.getElementById('seed').value,
+      genLen: document.getElementById('genLen').value,
+      temp: document.getElementById('tempR').value,
+      lossHist: lossHist.slice()
+    }
+  };
+}
+
+function exportModel() {
+  if (!gpt) { addLog('no model to export.', 'warn'); return; }
+  var payload = serializeModel();
+  var text = JSON.stringify(payload);
+  downloadText('gptjs-model.json', text);
+  addLog('model exported as JSON.', 'ok');
+}
+
+function restoreModel(payload) {
+  if (!payload || payload.format !== 'gpt.js-checkpoint-v1') {
+    addLog('format de checkpoint invalide.', 'warn');
+    return false;
+  }
+  var cfg = payload.config || {};
+  if (!payload.state || !payload.vocab || !cfg) {
+    addLog('checkpoint incomplet.', 'warn');
+    return false;
+  }
+  if (!Array.isArray(payload.vocab) || !payload.vocab.length) {
+    addLog('missing vocabulary.', 'warn');
+    return false;
+  }
+
+  var need = ['V','T','C','H','L'];
+  for (var i = 0; i < need.length; i++) {
+    if (typeof cfg[need[i]] !== 'number') {
+      addLog('config checkpoint invalide.', 'warn');
+      return false;
+    }
+  }
+
+  gpt = new MiniGPT(cfg.V, cfg.T, cfg.C, cfg.H, cfg.L, cfg.dr, cfg.lr);
+
+  var s = payload.state;
+  var ok = true;
+  gpt.wte = fromPlainMatrix(s.wte, gpt.V, gpt.C) || (ok = false, null);
+  gpt.wpe = fromPlainMatrix(s.wpe, gpt.T, gpt.C) || (ok = false, null);
+  gpt.lnFg = new Float32Array(s.lnFg && s.lnFg.length === gpt.C ? s.lnFg : []);
+  gpt.lnFb = new Float32Array(s.lnFb && s.lnFb.length === gpt.C ? s.lnFb : []);
+  gpt.head = fromPlainMatrix(s.head, gpt.V, gpt.C) || (ok = false, null);
+  gpt.bhead = new Float32Array(s.bhead && s.bhead.length === gpt.V ? s.bhead : []);
+
+  if (!gpt.wte || !gpt.wpe || !gpt.head || gpt.lnFg.length !== gpt.C || gpt.lnFb.length !== gpt.C || gpt.bhead.length !== gpt.V) ok = false;
+
+  if (!Array.isArray(s.blocks) || s.blocks.length !== gpt.L) ok = false;
+  for (var l = 0; ok && l < gpt.L; l++) {
+    var b = gpt.blocks[l];
+    var sb = s.blocks[l] || {};
+    b.ln1g = new Float32Array(sb.ln1g && sb.ln1g.length === gpt.C ? sb.ln1g : []);
+    b.ln1b = new Float32Array(sb.ln1b && sb.ln1b.length === gpt.C ? sb.ln1b : []);
+    b.Wq = fromPlainMatrix(sb.Wq, gpt.C, gpt.C);
+    b.Wk = fromPlainMatrix(sb.Wk, gpt.C, gpt.C);
+    b.Wv = fromPlainMatrix(sb.Wv, gpt.C, gpt.C);
+    b.Wo = fromPlainMatrix(sb.Wo, gpt.C, gpt.C);
+    b.bo = new Float32Array(sb.bo && sb.bo.length === gpt.C ? sb.bo : []);
+    b.ln2g = new Float32Array(sb.ln2g && sb.ln2g.length === gpt.C ? sb.ln2g : []);
+    b.ln2b = new Float32Array(sb.ln2b && sb.ln2b.length === gpt.C ? sb.ln2b : []);
+    b.Wf1 = fromPlainMatrix(sb.Wf1, 4 * gpt.C, gpt.C);
+    b.bf1 = new Float32Array(sb.bf1 && sb.bf1.length === 4 * gpt.C ? sb.bf1 : []);
+    b.Wf2 = fromPlainMatrix(sb.Wf2, gpt.C, 4 * gpt.C);
+    b.bf2 = new Float32Array(sb.bf2 && sb.bf2.length === gpt.C ? sb.bf2 : []);
+    if (!b.ln1g || !b.ln1b || !b.Wq || !b.Wk || !b.Wv || !b.Wo || !b.bo || !b.ln2g || !b.ln2b || !b.Wf1 || !b.bf1 || !b.Wf2 || !b.bf2) ok = false;
+  }
+
+  if (!ok) {
+    addLog('checkpoint incompatible avec ce code.', 'warn');
+    gpt = null;
+    return false;
+  }
+
+  vocab = payload.vocab.slice();
+  charToIdx = {}; idxToChar = {};
+  for (var vi = 0; vi < vocab.length; vi++) { charToIdx[vocab[vi]] = vi; idxToChar[vi] = vocab[vi]; }
+  document.getElementById('data').value = payload.ui && payload.ui.dataText ? payload.ui.dataText : document.getElementById('data').value;
+  if (payload.ui && typeof payload.ui.seed === 'string') document.getElementById('seed').value = payload.ui.seed;
+  if (payload.ui && payload.ui.genLen != null) document.getElementById('genLen').value = payload.ui.genLen;
+  if (payload.ui && payload.ui.temp != null) {
+    document.getElementById('tempR').value = payload.ui.temp;
+    document.getElementById('tempV').textContent = parseFloat(payload.ui.temp).toFixed(1);
+  }
+  lossHist = Array.isArray(payload.ui && payload.ui.lossHist) ? payload.ui.lossHist.slice() : [];
+  document.getElementById('fileName').textContent = 'checkpoint.json';
+  document.getElementById('sVocab').textContent  = vocab.length;
+  document.getElementById('sParams').textContent = fmtNum(gpt.countParams());
+  document.getElementById('sEpoch').textContent  = lossHist.length;
+  document.getElementById('sLoss').textContent   = lossHist.length ? Number(lossHist[lossHist.length - 1]).toFixed(4) : '--';
+  document.getElementById('btnGen').disabled = false;
+  document.getElementById('btnTrain').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('pbar').style.width = '100%';
+  drawLoss();
+  addLog('checkpoint imported.', 'ok');
+  return true;
+}
+
+function importModelFile(file) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var payload = JSON.parse(String(reader.result || '{}'));
+      restoreModel(payload);
+    } catch (err) {
+      addLog('JSON illisible.', 'warn');
+    }
+  };
+  reader.onerror = function () {
+    addLog('impossible de lire le checkpoint.', 'warn');
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function clearModel() {
+  stopTraining();
+  gpt = null;
+  lossHist = [];
+  document.getElementById('sVocab').textContent = '--';
+  document.getElementById('sParams').textContent = '--';
+  document.getElementById('sEpoch').textContent = '0';
+  document.getElementById('sLoss').textContent = '--';
+  document.getElementById('pbar').style.width = '0%';
+  document.getElementById('btnGen').disabled = true;
+  document.getElementById('output').textContent = "-- train the model first --";
+  document.getElementById('output').className = 'output-box empty';
+  addLog('model cleared.', 'warn');
+}
+
+function buildVocab() {
+  var text = document.getElementById('data').value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  var set = {};
+  for (var i = 0; i < text.length; i++) set[text[i]] = true;
+  vocab = Object.keys(set).sort();
+  charToIdx = {}; idxToChar = {};
+  for (var i = 0; i < vocab.length; i++) { charToIdx[vocab[i]] = i; idxToChar[i] = vocab[i]; }
+  return text;
+}
+
+function startTraining() {
+  var text = buildVocab();
+  if (text.length < 2) { addLog('text too short.', 'warn'); return; }
+
+  var blockSize = parseInt(document.getElementById('blockSize').value);
+  var nEmbd     = parseInt(document.getElementById('nEmbd').value);
+  var nHeads    = parseInt(document.getElementById('nHeads').value);
+  var nLayers   = parseInt(document.getElementById('nLayers').value);
+  var epochs    = parseInt(document.getElementById('epochs').value);
+  var batchSz   = parseInt(document.getElementById('batch').value);
+  var lr        = parseFloat(document.getElementById('lr').value);
+  var dr        = parseFloat(document.getElementById('dropout').value);
+
+  if (blockSize >= text.length) { addLog('ctx len must be smaller than the text length.', 'warn'); return; }
+  if (nEmbd % nHeads !== 0) { addLog('nEmbd doit etre divisible par nHeads.', 'warn'); return; }
+
+  gpt = new MiniGPT(vocab.length, blockSize, nEmbd, nHeads, nLayers, dr, lr);
+  lossHist = [];
+
+  document.getElementById('sVocab').textContent  = vocab.length;
+  document.getElementById('sParams').textContent = fmtNum(gpt.countParams());
+  document.getElementById('sEpoch').textContent  = '0';
+  document.getElementById('sLoss').textContent   = '--';
+  document.getElementById('btnTrain').disabled   = true;
+  document.getElementById('btnStop').disabled    = false;
+  document.getElementById('btnGen').disabled     = true;
+  document.getElementById('pbar').style.width    = '0%';
+
+  addLog('vocab=' + vocab.length + ' params=' + fmtNum(gpt.countParams()), 'ok');
+  addLog('nEmbd=' + nEmbd + ' nHeads=' + nHeads + ' nLayers=' + nLayers + ' lr=' + lr + ' dr=' + dr, 'hi');
+
+  var indices = [];
+  for (var i = 0; i < text.length; i++) indices.push(charToIdx.hasOwnProperty(text[i]) ? charToIdx[text[i]] : 0);
+
+  training = true;
+  var epoch = 0;
+  var smoothLoss = -Math.log(1.0 / vocab.length);
+
+  function step() {
+    if (!training || epoch >= epochs) {
+      training = false;
+      handle = null;
+      document.getElementById('btnTrain').disabled = false;
+      document.getElementById('btnStop').disabled  = true;
+      document.getElementById('btnGen').disabled   = false;
+      document.getElementById('pbar').style.width  = '100%';
+      addLog('done. loss=' + smoothLoss.toFixed(4), 'ok');
+      return;
+    }
+
+    var batchLoss = 0;
+    for (var b2 = 0; b2 < batchSz; b2++) {
+      var start   = Math.floor(Math.random() * (indices.length - blockSize - 1));
+      var tokens  = indices.slice(start, start + blockSize);
+      var targets = indices.slice(start + 1, start + blockSize + 1);
+      batchLoss  += gpt.trainStep(tokens, targets);
+    }
+
+    smoothLoss = smoothLoss * 0.96 + (batchLoss / batchSz) * 0.04;
+    lossHist.push(smoothLoss);
+    epoch++;
+
+    document.getElementById('sEpoch').textContent = epoch;
+    document.getElementById('sLoss').textContent  = smoothLoss.toFixed(4);
+    document.getElementById('pbar').style.width   = (epoch / epochs * 100) + '%';
+
+    if (epoch % 15 === 0) drawLoss();
+    if (epoch % 100 === 0) addLog('epoch ' + epoch + '/' + epochs + ' loss=' + smoothLoss.toFixed(4), epoch % 500 === 0 ? 'ok' : 'hi');
+
+    handle = setTimeout(step, 0);
+  }
+  step();
+}
+
+function stopTraining() {
+  training = false;
+  if (handle) clearTimeout(handle);
+  handle = null;
+  document.getElementById('btnTrain').disabled = false;
+  document.getElementById('btnStop').disabled  = true;
+  document.getElementById('btnGen').disabled   = false;
+  addLog('stopped.', 'warn');
+}
+
+function resetAll() {
+  stopTraining();
+  gpt = null; lossHist = [];
+  document.getElementById('sVocab').textContent  = '--';
+  document.getElementById('sParams').textContent = '--';
+  document.getElementById('sLoss').textContent   = '--';
+  document.getElementById('sEpoch').textContent  = '0';
+  document.getElementById('pbar').style.width    = '0%';
+  document.getElementById('btnGen').disabled     = true;
+  document.getElementById('output').textContent  = '-- train the model first --';
+  document.getElementById('output').className    = 'output-box empty';
+  document.getElementById('fileName').textContent = 'No file chosen';
+  var cvs = document.getElementById('cvs');
+  cvs.getContext('2d').clearRect(0, 0, cvs.width, cvs.height);
+  addLog('reset.', 'warn');
+}
+
+function generate() {
+  if (!gpt || !vocab.length) return;
+  var seed = document.getElementById('seed').value;
+  if (!seed) seed = vocab[0];
+  var len    = parseInt(document.getElementById('genLen').value);
+  var temp   = parseFloat(document.getElementById('tempR').value);
+  var result = gpt.generate(seed, len, charToIdx, idxToChar, temp);
+  document.getElementById('output').textContent = result;
+  document.getElementById('output').className   = 'output-box';
+  addLog('generated ' + result.length + ' chars (temp=' + temp + ')', 'ok');
+}
+
+document.getElementById('btnTrain').onclick = startTraining;
+document.getElementById('btnStop').onclick  = stopTraining;
+document.getElementById('btnReset').onclick = resetAll;
+document.getElementById('btnGen').onclick   = generate;
+document.getElementById('btnExportModel').onclick = exportModel;
+document.getElementById('btnImportModel').onclick = function () { document.getElementById('modelFile').click(); };
+document.getElementById('btnClearModel').onclick = clearModel;
+document.getElementById('tempR').oninput = function() {
+  document.getElementById('tempV').textContent = parseFloat(this.value).toFixed(1);
+};
+
+document.getElementById('fileName').textContent = 'No file chosen';
+
+var txtFile = document.getElementById('txtFile');
+var dropZone = document.getElementById('dropZone');
+txtFile.onchange = function () {
+  if (this.files && this.files[0]) loadTxtFile(this.files[0]);
+};
+dropZone.onclick = function () {
+  txtFile.click();
+};
+dropZone.ondragover = function (e) {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+};
+dropZone.ondragleave = function () {
+  dropZone.classList.remove('dragover');
+};
+dropZone.ondrop = function (e) {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+    loadTxtFile(e.dataTransfer.files[0]);
+  }
+};
+
+document.getElementById('modelFile').onchange = function () {
+  if (this.files && this.files[0]) importModelFile(this.files[0]);
+  this.value = '';
+};
+</script>
+
+<!-- PWA Service Worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker
+        .register('./service-worker.js', { scope: './' })
+        .then(function (reg) {
+          console.log('[PWA] SW registered. Scope:', reg.scope);
+        })
+        .catch(function (err) {
+          console.warn('[PWA] SW registration failed:', err);
+        });
+    });
+  }
+</script>
+</body>
+</html>
