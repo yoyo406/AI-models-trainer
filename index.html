@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
@@ -304,46 +304,46 @@ input[type=range] { accent-color: #888; cursor: pointer; width: 70px; }
   <p>transformer decoder — char-level — adam optimizer — pure js</p>
 </div>
 
-<!-- DONNÉES -->
+<!-- DATA -->
 <div class="sec">
-  <div class="sec-title">données</div>
-  <textarea id="data">Le renard roux saute par-dessus le chien paresseux.
-La lune brille dans le ciel étoilé de la nuit.
-Le vent souffle doucement sur les feuilles des arbres.
-Le chat noir dort sur le toit de la vieille maison.
-Les enfants jouent dans le jardin sous le soleil chaud.
-La rivière coule lentement entre les pierres et les herbes.
-Le boulanger prépare le pain chaud tôt le matin.
-Les oiseaux chantent dans les branches des arbres verts.
-La mer est calme et bleue sous le ciel clair.
-Le soleil se couche derrière les collines au loin.
-Le cheval galope dans la prairie au coucher du soleil.
-La neige tombe doucement sur la ville endormie.
-Le vieux pêcheur attend patiemment sur le bord du lac.
-Les étoiles brillent dans le ciel sombre de la nuit.
-Le professeur explique la leçon aux élèves attentifs.
-La petite fille lit un livre dans sa chambre tranquille.
-Le cuisinier prépare un repas délicieux pour sa famille.
-Les nuages blancs flottent dans le ciel bleu du matin.
-Le jardinier arrose les fleurs sous la pluie fine.
-La vieille horloge sonne minuit dans le couloir sombre.
-Le train passe lentement sur le pont de pierre grise.
-Les enfants rient et courent dans la cour de récréation.</textarea>
+  <div class="sec-title">data</div>
+  <textarea id="data">The quick brown fox jumps over the lazy dog.
+The moon shines in the starry night sky.
+The wind blows gently through the tree leaves.
+The black cat sleeps on the roof of the old house.
+The children play in the garden under the warm sun.
+The river flows slowly between the stones and the grass.
+The baker prepares warm bread early in the morning.
+The birds sing in the branches of the green trees.
+The sea is calm and blue under the clear sky.
+The sun sets behind the hills in the distance.
+The horse gallops across the meadow at sunset.
+The snow falls softly on the sleeping city.
+The old fisherman waits patiently on the edge of the lake.
+The stars shine in the dark night sky.
+The teacher explains the lesson to attentive students.
+The little girl reads a book in her quiet room.
+The cook prepares a delicious meal for the family.
+The white clouds float in the blue morning sky.
+The gardener waters the flowers under the fine rain.
+The old clock strikes midnight in the dark hallway.
+The train passes slowly over the gray stone bridge.
+The children laugh and run in the schoolyard.</textarea>
 
   <div class="upload-card">
-    <div class="drop-zone" id="dropZone">Dépose un fichier .txt ici ou clique pour choisir</div>
+    <div class="drop-zone" id="dropZone">Drop a .txt file here or click to choose</div>
     <div class="upload-row">
-      <label class="upload-btn" for="txtFile">Choisir un fichier</label>
-      <span class="file-name" id="fileName">Aucun fichier choisi</span>
+      <label class="upload-btn" for="txtFile">Choose a file</label>
+      <span class="file-name" id="fileName">No file chosen</span>
     </div>
     <input type="file" id="txtFile" accept=".txt,text/plain">
   </div>
 
 </div>
 
-<!-- HYPERPARAMS -->
+<!-- HYPERPARAMETERS -->
 <div class="sec">
-  <div class="sec-title">hyperparamètres</div>
+  <div class="sec-title">hyperparameters</div>
   <div class="params-grid">
     <div class="field"><label>ctx len</label><input type="number" id="blockSize" value="24" min="8" max="64"></div>
     <div class="field"><label>n_embd</label><input type="number" id="nEmbd" value="48" min="16" max="256" step="8"></div>
@@ -363,7 +363,7 @@ Les enfants rient et courent dans la cour de récréation.</textarea>
 
 <!-- TRAINING VIZ -->
 <div class="sec">
-  <div class="sec-title">entraînement</div>
+  <div class="sec-title">training</div>
   <canvas id="cvs"></canvas>
   <div class="prog-wrap"><div class="prog-fill" id="pbar"></div></div>
   <div class="stats-grid">
@@ -378,8 +378,8 @@ Les enfants rient et courent dans la cour de récréation.</textarea>
 
 <!-- OUTPUT -->
 <div class="sec">
-  <div class="sec-title">génération</div>
-  <div class="output-box empty" id="output">-- entraîne d'abord le modèle --</div>
+  <div class="sec-title">generation</div>
+  <div class="output-box empty" id="output">-- train the model first --</div>
   <div class="gen-controls">
     <input type="text" id="seed" value="Le " placeholder="seed...">
     <div class="field"><label>len</label><input type="number" id="genLen" value="150" min="20" max="800" style="width:75px"></div>
@@ -394,17 +394,17 @@ Les enfants rient et courent dans la cour de récréation.</textarea>
   </div>
 </div>
 
-<!-- MODÈLE -->
+<!-- MODEL -->
 <div class="sec">
-  <div class="sec-title">modèle</div>
+  <div class="sec-title">model</div>
   <div class="btns">
     <button id="btnExportModel">⬇ export .json</button>
     <button id="btnImportModel">⬆ import .json</button>
-    <button id="btnClearModel">✕ vider modèle</button>
+    <button id="btnClearModel">✕ clear model</button>
   </div>
   <input type="file" id="modelFile" accept="application/json,.json" style="display:none">
   <div style="margin-top:10px;color:#666;font-size:12px;line-height:1.6">
-    exporte un checkpoint portable. vrai GGUF non supporté ici, parce que ce modèle JS n'est pas un Llama déguisé.
+    Exports a portable checkpoint. Real GGUF is not supported here, because this JS model is not a disguised Llama.
   </div>
 </div>
 
@@ -430,7 +430,7 @@ function scaleVec(a, s) {
   return r;
 }
 
-// Softmax avec température
+// Softmax with temperature
 function softmax(x, T) {
   T = T || 1.0;
   var mx = x[0];
@@ -581,7 +581,7 @@ Adam.prototype.step = function(params) {
 };
 
 // =============================================================================
-// MINI GPT — Transformer Decoder avec vraie backpropagation
+// MINI GPT — Transformer decoder with real backpropagation
 // =============================================================================
 function MiniGPT(vocabSize, blockSize, nEmbd, nHeads, nLayers, dropoutRate, lr) {
   this.V  = vocabSize;
@@ -1087,15 +1087,15 @@ function fmtNum(n) {
 
 function setDataText(text, fileName) {
   document.getElementById('data').value = text;
-  document.getElementById('fileName').textContent = fileName || 'Aucun fichier choisi';
+  document.getElementById('fileName').textContent = fileName || 'No file chosen';
   buildVocab();
-  addLog('txt chargé: ' + (fileName || 'fichier'), 'ok');
+  addLog('txt loaded: ' + (fileName || 'file'), 'ok');
 }
 
 function loadTxtFile(file) {
   if (!file) return;
   if (!/\.txt$/i.test(file.name) && file.type && file.type !== 'text/plain') {
-    addLog('format refusé: .txt uniquement.', 'warn');
+    addLog('rejected format: .txt only.', 'warn');
     return;
   }
   document.getElementById('fileName').textContent = file.name;
@@ -1105,7 +1105,7 @@ function loadTxtFile(file) {
     setDataText(text, file.name);
   };
   reader.onerror = function () {
-    addLog('impossible de lire le fichier.', 'warn');
+    addLog('unable to read the file.', 'warn');
   };
   reader.readAsText(file, 'utf-8');
 }
@@ -1129,55 +1129,6 @@ function fromPlainMatrix(src, rows, cols) {
 
 function toPlainArray(arr) {
   return Array.prototype.slice.call(arr);
-}
-
-function serializeAdamState(opt) {
-  if (!opt) return null;
-  var state = {};
-  for (var key in opt.state) {
-    if (!Object.prototype.hasOwnProperty.call(opt.state, key)) continue;
-    var st = opt.state[key];
-    state[key] = {
-      m: Array.isArray(st.m) ? toPlainMatrix(st.m) : (st.m ? toPlainArray(st.m) : null),
-      v: Array.isArray(st.v) ? toPlainMatrix(st.v) : (st.v ? toPlainArray(st.v) : null)
-    };
-  }
-  return {
-    lr: opt.lr,
-    b1: opt.b1,
-    b2: opt.b2,
-    wd: opt.wd,
-    t: opt.t,
-    state: state
-  };
-}
-
-function restoreAdamState(opt, data) {
-  if (!opt || !data || typeof data !== 'object') return false;
-  if (typeof data.lr === 'number') opt.lr = data.lr;
-  if (typeof data.b1 === 'number') opt.b1 = data.b1;
-  if (typeof data.b2 === 'number') opt.b2 = data.b2;
-  if (typeof data.wd === 'number') opt.wd = data.wd;
-  if (typeof data.t === 'number' && data.t >= 0) opt.t = data.t;
-  if (!data.state || typeof data.state !== 'object') return true;
-  opt.state = {};
-  for (var key in data.state) {
-    if (!Object.prototype.hasOwnProperty.call(data.state, key)) continue;
-    var st = data.state[key] || {};
-    var rec = { m: null, v: null };
-    if (Array.isArray(st.m) && Array.isArray(st.m[0])) {
-      rec.m = st.m.map(function (row) { return new Float32Array(Array.isArray(row) ? row : []); });
-    } else if (Array.isArray(st.m)) {
-      rec.m = new Float32Array(st.m);
-    }
-    if (Array.isArray(st.v) && Array.isArray(st.v[0])) {
-      rec.v = st.v.map(function (row) { return new Float32Array(Array.isArray(row) ? row : []); });
-    } else if (Array.isArray(st.v)) {
-      rec.v = new Float32Array(st.v);
-    }
-    opt.state[key] = rec;
-  }
-  return true;
 }
 
 function downloadText(filename, text) {
@@ -1237,7 +1188,6 @@ function serializeModel() {
       head: toPlainMatrix(gpt.head),
       bhead: toPlainArray(gpt.bhead)
     },
-    optimizer: serializeAdamState(gpt.opt),
     ui: {
       dataText: document.getElementById('data').value,
       seed: document.getElementById('seed').value,
@@ -1249,11 +1199,11 @@ function serializeModel() {
 }
 
 function exportModel() {
-  if (!gpt) { addLog('aucun modèle à exporter.', 'warn'); return; }
+  if (!gpt) { addLog('no model to export.', 'warn'); return; }
   var payload = serializeModel();
   var text = JSON.stringify(payload);
   downloadText('gptjs-model.json', text);
-  addLog('modèle exporté en JSON.', 'ok');
+  addLog('model exported as JSON.', 'ok');
 }
 
 function restoreModel(payload) {
@@ -1267,7 +1217,7 @@ function restoreModel(payload) {
     return false;
   }
   if (!Array.isArray(payload.vocab) || !payload.vocab.length) {
-    addLog('vocabulaire manquant.', 'warn');
+    addLog('missing vocabulary.', 'warn');
     return false;
   }
 
@@ -1318,8 +1268,6 @@ function restoreModel(payload) {
     return false;
   }
 
-  if (payload.optimizer) restoreAdamState(gpt.opt, payload.optimizer);
-
   vocab = payload.vocab.slice();
   charToIdx = {}; idxToChar = {};
   for (var vi = 0; vi < vocab.length; vi++) { charToIdx[vocab[vi]] = vi; idxToChar[vi] = vocab[vi]; }
@@ -1341,7 +1289,7 @@ function restoreModel(payload) {
   document.getElementById('btnStop').disabled = true;
   document.getElementById('pbar').style.width = '100%';
   drawLoss();
-  addLog('checkpoint importé.', 'ok');
+  addLog('checkpoint imported.', 'ok');
   return true;
 }
 
@@ -1372,14 +1320,9 @@ function clearModel() {
   document.getElementById('sLoss').textContent = '--';
   document.getElementById('pbar').style.width = '0%';
   document.getElementById('btnGen').disabled = true;
-  document.getElementById('output').textContent = "-- entraîne d'abord le modèle --";
+  document.getElementById('output').textContent = "-- train the model first --";
   document.getElementById('output').className = 'output-box empty';
-  var txtInput = document.getElementById('txtFile');
-  if (txtInput) txtInput.value = '';
-  var modelInput = document.getElementById('modelFile');
-  if (modelInput) modelInput.value = '';
-  document.getElementById('fileName').textContent = 'Aucun fichier choisi';
-  addLog('modèle vidé.', 'warn');
+  addLog('model cleared.', 'warn');
 }
 
 function buildVocab() {
@@ -1393,9 +1336,8 @@ function buildVocab() {
 }
 
 function startTraining() {
-  if (training) stopTraining();
   var text = buildVocab();
-  if (text.length < 2) { addLog('texte trop court.', 'warn'); return; }
+  if (text.length < 2) { addLog('text too short.', 'warn'); return; }
 
   var blockSize = parseInt(document.getElementById('blockSize').value);
   var nEmbd     = parseInt(document.getElementById('nEmbd').value);
@@ -1406,7 +1348,7 @@ function startTraining() {
   var lr        = parseFloat(document.getElementById('lr').value);
   var dr        = parseFloat(document.getElementById('dropout').value);
 
-  if (blockSize >= text.length) { addLog('ctx len doit être plus petit que la taille du texte.', 'warn'); return; }
+  if (blockSize >= text.length) { addLog('ctx len must be smaller than the text length.', 'warn'); return; }
   if (nEmbd % nHeads !== 0) { addLog('nEmbd doit etre divisible par nHeads.', 'warn'); return; }
 
   gpt = new MiniGPT(vocab.length, blockSize, nEmbd, nHeads, nLayers, dr, lr);
@@ -1486,23 +1428,16 @@ function resetAll() {
   document.getElementById('sEpoch').textContent  = '0';
   document.getElementById('pbar').style.width    = '0%';
   document.getElementById('btnGen').disabled     = true;
-  document.getElementById('output').textContent  = "-- entraîne d'abord le modèle --";
+  document.getElementById('output').textContent  = '-- train the model first --';
   document.getElementById('output').className    = 'output-box empty';
-  document.getElementById('fileName').textContent = 'Aucun fichier choisi';
-  var txtInput = document.getElementById('txtFile');
-  if (txtInput) txtInput.value = '';
-  var modelInput = document.getElementById('modelFile');
-  if (modelInput) modelInput.value = '';
+  document.getElementById('fileName').textContent = 'No file chosen';
   var cvs = document.getElementById('cvs');
   cvs.getContext('2d').clearRect(0, 0, cvs.width, cvs.height);
   addLog('reset.', 'warn');
 }
 
 function generate() {
-  if (!gpt || !vocab.length) {
-    addLog('aucun modèle chargé.', 'warn');
-    return;
-  }
+  if (!gpt || !vocab.length) return;
   var seed = document.getElementById('seed').value;
   if (!seed) seed = vocab[0];
   var len    = parseInt(document.getElementById('genLen').value);
@@ -1524,7 +1459,7 @@ document.getElementById('tempR').oninput = function() {
   document.getElementById('tempV').textContent = parseFloat(this.value).toFixed(1);
 };
 
-document.getElementById('fileName').textContent = 'Aucun fichier choisi';
+document.getElementById('fileName').textContent = 'No file chosen';
 
 var txtFile = document.getElementById('txtFile');
 var dropZone = document.getElementById('dropZone');
