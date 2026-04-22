@@ -45,8 +45,6 @@ gpt.js/
 ├── icons/
 │   ├── icon-192.png     # Mobile
 │   ├── icon-512.png     # Desktop
-│   ├── apple-touch-icon.png
-│   └── icon-512-maskable.png
 └── README.md
 ```
 
