@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080808">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>transformer.js · GPU</title>
+<title>transformer.js · gpu</title>
 <style>
 /* =============================================================================
    transformer.js · Apple HIG — dark, professional, real glass
@@ -131,18 +131,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
   align-items: center;
   gap: 10px;
 }
-.brand h1::before {
-  content: '';
-  display: inline-block;
-  width: 22px; height: 22px;
-  border-radius: 7px;
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.55), transparent 60%),
-    linear-gradient(135deg, var(--accent), var(--teal));
-  box-shadow: 0 2px 8px rgba(10,132,255,0.40),
-              inset 0 0 0 0.5px rgba(255,255,255,0.20);
-  flex-shrink: 0;
-}
+
 
 .brand p {
   margin: 4px 0 0;
@@ -463,10 +452,56 @@ canvas {
   .status-pill { width: 100%; justify-content: center; }
   .btns .btn, .small-actions .btn { flex-basis: 100%; }
 }
+
+/* ---------- TAB BAR (iOS-style fixed bottom) ------------------------------- */
+.tab-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0; z-index: 100;
+  height: 82px;
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+  background: rgba(18,18,20,0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(40px);
+  backdrop-filter: saturate(180%) blur(40px);
+  border-top: 0.5px solid rgba(255,255,255,0.12);
+  display: flex;
+  align-items: flex-start;
+  padding-top: 8px;
+  justify-content: space-around;
+}
+.tab-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; cursor: pointer; padding: 4px 20px; border: none;
+  background: transparent; color: var(--label-secondary);
+  font-size: 10px; font-weight: 510; letter-spacing: -0.01em;
+  transition: color 150ms var(--easing); min-width: 72px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.tab-item svg { width: 24px; height: 24px; transition: transform 120ms var(--easing); }
+.tab-item.active { color: var(--accent); }
+.tab-item.active svg { transform: scale(1.06); }
+.tab-item:active svg { transform: scale(0.90); }
+
+/* ---------- PANELS --------------------------------------------------------- */
+.panel { display: none; }
+.panel.active { display: block; }
+
+.layout-train {
+  display: grid;
+  grid-template-columns: minmax(0,1.5fr) minmax(280px,.85fr);
+  gap: 16px; align-items: start;
+}
+@media (max-width: 980px) { .layout-train { grid-template-columns: 1fr; } }
+
+/* Body padding for tab bar */
+body { padding-bottom: 90px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu@4.22.0/dist/tf-backend-webgpu.min.js"></script>
 </head>
 <body>
   <main class="shell">
@@ -474,16 +509,17 @@ canvas {
       <div class="brand">
         <div>
           <h1>transformer.js</h1>
-          <p>Decoder transformer · TensorFlow.js · WebGPU/WebGL · GPU-only training · Web Worker · autosave IndexedDB</p>
+          <p>Decoder transformer · TensorFlow.js · WebGPU/WebGL · GPU-only · autosave IndexedDB</p>
         </div>
-        <div id="statusPill" class="status-pill" data-kind="safe">Initializing GPU…</div>
+        <div id="statusPill" class="status-pill" data-kind="safe">Init…</div>
       </div>
     </div>
 
-    <div class="layout">
+    <!-- ═══ DATA PANEL ═══ -->
+    <div id="panelData" class="panel active">
       <div class="grid">
         <section class="card">
-          <h2>Data</h2>
+          <h2>Training Data</h2>
           <textarea id="data" class="textarea" spellcheck="false">A small fox jumps over the lazy dog.
 The moon shines above the quiet city.
 Wind moves softly through the trees.
@@ -504,20 +540,26 @@ A train crosses the bridge at dusk.</textarea>
           </div>
           <div class="note" id="datasetInfo">0 chars · 0 words · load 0</div>
         </section>
+      </div>
+    </div>
 
+    <!-- ═══ TRAIN PANEL ═══ -->
+    <div id="panelTrain" class="panel">
+      <div class="layout-train">
+        <div class="grid">
         <section class="card">
           <h2>Hyperparameters</h2>
           <div class="fields">
-            <div class="field"><label for="blockSize">context length</label><input id="blockSize" class="input" type="number" min="4" max="512" value="64"></div>
+            <div class="field"><label for="blockSize">ctx len</label><input id="blockSize" class="input" type="number" min="4" max="512" value="64"></div>
             <div class="field"><label for="nEmbd">n_embd</label><input id="nEmbd" class="input" type="number" min="8" max="1024" step="8" value="128"></div>
             <div class="field"><label for="nHeads">n_heads</label><input id="nHeads" class="input" type="number" min="1" max="32" value="8"></div>
             <div class="field"><label for="nLayers">n_layers</label><input id="nLayers" class="input" type="number" min="1" max="16" value="4"></div>
             <div class="field"><label for="epochs">steps</label><input id="epochs" class="input" type="number" min="1" max="100000" step="100" value="3000"></div>
             <div class="field"><label for="batch">batch</label><input id="batch" class="input" type="number" min="1" max="256" value="16"></div>
             <div class="field"><label for="lr">lr</label><input id="lr" class="input" type="number" min="0.000001" step="0.0001" value="0.0006"></div>
-            <div class="field"><label for="lrEnd">learning rate end</label><input id="lrEnd" class="input" type="number" min="0.000001" step="0.00001" value="0.00006"></div>
+            <div class="field"><label for="lrEnd">lr end</label><input id="lrEnd" class="input" type="number" min="0.000001" step="0.00001" value="0.00006"></div>
             <div class="field"><label for="warmup">warmup</label><input id="warmup" class="input" type="number" min="0" max="10000" value="100"></div>
-            <div class="field"><label for="weightDecay">weight decay</label><input id="weightDecay" class="input" type="number" min="0" max="1" step="0.01" value="0.1"></div>
+            <div class="field"><label for="weightDecay">w decay</label><input id="weightDecay" class="input" type="number" min="0" max="1" step="0.01" value="0.1"></div>
             <div class="field"><label for="gradClip">grad clip</label><input id="gradClip" class="input" type="number" min="0" max="100" step="0.1" value="1.0"></div>
             <div class="field"><label for="dropout">dropout</label><input id="dropout" class="input" type="number" min="0" max="0.5" step="0.05" value="0.1"></div>
             <div class="field"><label for="tokenizer">tokenizer</label>
@@ -547,7 +589,7 @@ A train crosses the bridge at dusk.</textarea>
             <button id="btnBalancedPreset" class="btn">Balanced preset</button>
             <button id="btnMaxPreset" class="btn">Max preset</button>
           </div>
-          <div class="note">Training runs in a Web Worker on the GPU. If no GPU backend is available (neither WebGPU nor WebGL), the worker refuses to start.</div>
+          <div class="note">L'entraînement se fait dans un Web Worker, sur le GPU. Si aucun backend GPU n'est disponible (ni WebGPU ni WebGL), le worker refuse de démarrer.</div>
         </section>
 
         <section class="card">
@@ -562,16 +604,49 @@ A train crosses the bridge at dusk.</textarea>
             <div class="metric"><div class="k">best</div><div id="sBest" class="v">--</div></div>
             <div class="metric"><div class="k">speed</div><div id="sSpeed" class="v small">--</div></div>
             <div class="metric"><div class="k">elapsed</div><div id="sTime" class="v small">--</div></div>
-            <div class="metric"><div class="k">GPU memory</div><div id="sMem" class="v small">--</div></div>
+            <div class="metric"><div class="k">gpu mem</div><div id="sMem" class="v small">--</div></div>
           </div>
         </section>
 
+        </div><!-- /left col train -->
+        <aside class="grid">
+        <section id="sectionSafety" class="card">
+          <h2>GPU &amp; Safety</h2>
+          <div class="metric" style="margin-bottom:12px;">
+            <div class="k">backend</div><div id="sBackend" class="v small">--</div>
+          </div>
+          <div class="metric" style="margin-bottom:12px;">
+            <div class="k">device</div><div id="sDevice" class="v small">--</div>
+          </div>
+          <div class="metric" style="margin-bottom:12px;">
+            <div class="k">risk</div><div id="sRisk" class="v" data-kind="safe">SAFE</div>
+          </div>
+          <div class="recommend-box" id="sRecommend">Recommended settings will appear here.</div>
+          <div class="metric" style="margin-top:12px;">
+            <div class="k">tokenizer</div><div id="sTokenCount" class="v small">char</div>
+          </div>
+          <div class="note">L'entraînement est forcé sur GPU. WebGPU est privilégié, WebGL est utilisé en fallback. Le CPU est explicitement refusé.</div>
+        </section>
+
         <section class="card">
+          <h2>Log</h2>
+          <div id="log" class="log">
+            <div class="log-line">ready.</div>
+          </div>
+        </section>
+        </aside>
+      </div><!-- /layout-train -->
+    </div><!-- /panelTrain -->
+
+    <!-- ═══ CHAT PANEL ═══ -->
+    <div id="panelChat" class="panel">
+      <div class="grid" id="chatPanelContent">
+<section class="card">
           <h2>Generation</h2>
           <div class="section-tight">
             <div class="fields">
               <div class="field" style="grid-column: span 2;"><label for="seed">seed</label><input id="seed" class="input" type="text" placeholder="Start typing here"></div>
-              <div class="field"><label for="genLen">length</label><input id="genLen" class="input" type="number" min="1" max="2000" value="150"></div>
+              <div class="field"><label for="genLen">len</label><input id="genLen" class="input" type="number" min="1" max="2000" value="150"></div>
               <div class="field range-field">
                 <div class="field-head">
                   <label for="tempR">temp</label>
@@ -599,39 +674,40 @@ A train crosses the bridge at dusk.</textarea>
           </div>
           <input id="modelFile" type="file" accept=".json,application/json" hidden>
           <div class="footer-note">
-            Portable checkpoints (JSON). The format changed to store TF.js model weights (schema 3) - older v2 checkpoints are no longer compatible.
+            Checkpoints portables (JSON). Le format a changé pour stocker les poids du modèle TF.js (schema 3) — les anciens checkpoints v2 ne sont plus compatibles.
           </div>
         </section>
       </div>
-
-      <aside class="grid">
-        <section id="sectionSafety" class="card">
-          <h2>GPU &amp; Safety</h2>
-          <div class="metric" style="margin-bottom:12px;">
-            <div class="k">backend</div><div id="sBackend" class="v small">--</div>
-          </div>
-          <div class="metric" style="margin-bottom:12px;">
-            <div class="k">device</div><div id="sDevice" class="v small">--</div>
-          </div>
-          <div class="metric" style="margin-bottom:12px;">
-            <div class="k">risk</div><div id="sRisk" class="v" data-kind="safe">SAFE</div>
-          </div>
-          <div class="recommend-box" id="sRecommend">Recommended settings will appear here.</div>
-          <div class="metric" style="margin-top:12px;">
-            <div class="k">tokenizer</div><div id="sTokenCount" class="v small">char</div>
-          </div>
-          <div class="note">Training is forced onto the GPU. WebGPU is preferred; WebGL is used as a fallback. CPU is explicitly refused.</div>
-        </section>
-
-        <section class="card">
-          <h2>Log</h2>
-          <div id="log" class="log">
-            <div class="log-line">ready.</div>
-          </div>
-        </section>
-      </aside>
+      </div>
     </div>
+
   </main>
+
+  <!-- ═══ iOS TAB BAR ═══ -->
+  <nav class="tab-bar" role="tablist">
+    <button class="tab-item active" data-panel="panelData" role="tab" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+      Data
+    </button>
+    <button class="tab-item" data-panel="panelTrain" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Train
+    </button>
+    <button class="tab-item" data-panel="panelChat" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Chat
+    </button>
+  </nav>
 
   <script>
   // =============================================================================
@@ -1223,16 +1299,9 @@ async function trainAsync(payload) {
   var badCount = 0;
   var totalSeen = 0;
   var paramNames = model.trainables().map(function (v) { return v.name; });
-  var maxBytesSoft = Math.max(128 * 1024 * 1024, parseInt(cfg.maxMemoryBytes, 10) || 512 * 1024 * 1024);
 
   for (var step = 1; step <= steps; step++) {
     if (STATE.stopRequested) break;
-
-    var mem = postMemoryUsage();
-    if (mem && mem.numBytes > maxBytesSoft) {
-      postStatus('error', { message: 'Memory limit reached, stopping training before a crash.' });
-      break;
-    }
 
     // Build a mini-batch from random offsets — done synchronously then uploaded once.
     var inBuf = new Int32Array(batch * blockSize);
@@ -1252,17 +1321,15 @@ async function trainAsync(payload) {
 
     var lossVal;
     try {
-      tf.engine().startScope();
       var grads = tf.variableGrads(function () {
         return model.lossAndLogits(inputs, targets);
       }, model.trainables());
       lossVal = (await grads.value.data())[0];
       grads.value.dispose();
       optimizer.step(grads.grads, gradClip);
+      // Free per-step grads
       Object.keys(grads.grads).forEach(function (k) { grads.grads[k].dispose(); });
-      tf.engine().endScope();
     } catch (err) {
-      try { tf.engine().endScope(); } catch (_) {}
       inputs.dispose(); targets.dispose();
       postStatus('error', { message: 'Training step failed: ' + (err.message || err) });
       break;
@@ -1276,7 +1343,7 @@ async function trainAsync(payload) {
     STATE.stats.epoch = step;
     STATE.stats.smoothLoss = smooth;
     STATE.stats.lossHistory.push(smooth);
-    if (STATE.stats.lossHistory.length > 300) STATE.stats.lossHistory.shift();
+    if (STATE.stats.lossHistory.length > 600) STATE.stats.lossHistory.shift();
 
     if (smooth < best - minDelta) {
       best = smooth;
@@ -1293,19 +1360,14 @@ async function trainAsync(payload) {
         epoch: step, epochs: steps,
         loss: smooth, bestLoss: best,
         lr: lr, speed: speed, elapsed: elapsed,
-        lossHistory: STATE.stats.lossHistory.slice(-120),
+        lossHistory: STATE.stats.lossHistory.slice(-200),
         memory: postMemoryUsage()
       });
     }
 
     if (autosaveEnabled && step % autosaveEvery === 0) {
-      var mem2 = postMemoryUsage();
-      if (!mem2 || mem2.numBytes < maxBytesSoft * 0.75) {
-        var ckpt = await makeCheckpoint(STATE);
-        postStatus('autosave', { checkpoint: ckpt });
-      } else {
-        postStatus('log', { level: 'warn', message: 'Autosave skipped because memory is getting tight.' });
-      }
+      var ckpt = await makeCheckpoint(STATE);
+      postStatus('autosave', { checkpoint: ckpt });
     }
 
     if (badCount >= patience) {
@@ -1313,18 +1375,13 @@ async function trainAsync(payload) {
       break;
     }
 
+    // Yield to keep the worker responsive (await already gives a microtask boundary).
     if (step % 4 === 0) await sleep(0);
   }
 
   STATE.training = false;
   var reason = STATE.stopRequested ? 'stopped' : 'finished';
-  var checkpoint = null;
-  var finalMem = postMemoryUsage();
-  if (!finalMem || finalMem.numBytes < maxBytesSoft * 0.85) {
-    checkpoint = await makeCheckpoint(STATE);
-  } else {
-    postStatus('log', { level: 'warn', message: 'Final checkpoint skipped because memory was too high.' });
-  }
+  var checkpoint = await makeCheckpoint(STATE);
   postStatus('done', {
     reason: reason,
     checkpoint: checkpoint,
@@ -1367,13 +1424,14 @@ async function generateAsync(msg) {
     for (var q = 0; q < trimmed.length; q++) padded[pad + q] = trimmed[q];
 
     var lastIdx = Tmax - 1;
-    var input = tf.tensor2d(padded, [1, Tmax], 'int32');
-    var logits = STATE.model.forward(input, false);   // [1, T, V]
-    var lastLogits = logits.slice([0, lastIdx, 0], [1, 1, STATE.model.V]).reshape([STATE.model.V]);
-    var scaled = lastLogits.div(temp);
-    var probs = tf.softmax(scaled);
-    var probsArr = await probs.data();
-    input.dispose(); logits.dispose(); lastLogits.dispose(); scaled.dispose(); probs.dispose();
+    var probsArr = await tf.tidy(function () {
+      var input = tf.tensor2d(padded, [1, Tmax], 'int32');
+      var logits = STATE.model.forward(input, false);   // [1, T, V]
+      var lastLogits = logits.slice([0, lastIdx, 0], [1, 1, STATE.model.V]).reshape([STATE.model.V]);
+      var scaled = lastLogits.div(temp);
+      var probs = tf.softmax(scaled);
+      return probs.array();
+    });
 
     var next = sampleFromDistribution(probsArr, topK, topP);
     ctx.push(next);
@@ -1698,12 +1756,79 @@ self.onmessage = async function (e) {
       } catch (_) {}
     }
 
+
+    // ===== FakeWorker: runs worker source on main thread (blob: blocked in sandbox) =====
+    class FakeWorker {
+      constructor(source) {
+        // Strip importScripts — tf is already loaded in <head>
+        const clean = source
+          .replace(/self\.importScripts\s*\([^)]*\)\s*;?/g, '')
+          .replace(/importScripts\s*\([^)]*\)\s*;?/g, '');
+
+        this.onmessage = null;
+        this.onerror   = null;
+        const worker = this;
+
+        const fakeSelf = {
+          onmessage: null,
+          postMessage(msg) {
+            setTimeout(() => { if (worker.onmessage) worker.onmessage({ data: msg }); }, 0);
+          },
+          importScripts() {},
+          addEventListener(type, fn) {
+            if (type === 'message') fakeSelf.onmessage = fn;
+          },
+          removeEventListener() {},
+          navigator: window.navigator,
+          performance: window.performance,
+          console: window.console,
+          setTimeout: window.setTimeout.bind(window),
+          clearTimeout: window.clearTimeout.bind(window),
+          tf: window.tf,
+        };
+        this._self = fakeSelf;
+
+        try {
+          // eslint-disable-next-line no-new-func
+          const fn = new Function('self', clean);
+          fn(fakeSelf);
+        } catch (e) {
+          if (this.onerror) this.onerror(e);
+          console.error('FakeWorker init error:', e);
+        }
+      }
+
+      postMessage(msg) {
+        const fs = this._self;
+        setTimeout(() => { if (fs.onmessage) fs.onmessage({ data: msg }); }, 0);
+      }
+
+      terminate() {
+        this._self = { postMessage() {}, onmessage: null };
+        this.onmessage = null;
+        this.onerror   = null;
+      }
+    }
+
+    // ===== iOS Tab bar =====
+    function initTabs() {
+      document.querySelectorAll('.tab-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.panel;
+          document.querySelectorAll('.tab-item').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+          document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          btn.setAttribute('aria-selected','true');
+          document.getElementById(target).classList.add('active');
+          haptic('light');
+        });
+      });
+    }
+
     // ----- Worker plumbing -----
     function ensureWorker() {
       if (worker) return worker;
-      const blob = new Blob([WORKER_SOURCE], { type: 'application/javascript' });
-      const url = URL.createObjectURL(blob);
-      worker = new Worker(url);
+      worker = new FakeWorker(WORKER_SOURCE);
       worker.onmessage = onWorkerMessage;
       worker.onerror = (err) => {
         busy = false;
@@ -1713,7 +1838,7 @@ self.onmessage = async function (e) {
       };
       // Initialize backend
       worker.postMessage({ type: 'init' });
-      setStatus('Initializing GPU…', 'warn');
+      setStatus('Init GPU…', 'warn');
       return worker;
     }
     function postToWorker(msg) {
@@ -1874,7 +1999,7 @@ self.onmessage = async function (e) {
       els.sParams.textContent = '--';
       els.sVocab.textContent = '--';
       els.pbar.style.width = '0%';
-      setStatus(backendInfo ? 'Ready' : 'Initializing GPU…', backendInfo ? 'safe' : 'warn');
+      setStatus(backendInfo ? 'Ready' : 'Init GPU…', backendInfo ? 'safe' : 'warn');
     }
 
     function resetAll() {
@@ -2220,6 +2345,7 @@ self.onmessage = async function (e) {
       setupFileUpload();
       bindEvents();
       addHaptics();
+      initTabs();
       initTempControl();
       loadSettings();
       updateSafetyUI();
@@ -2228,7 +2354,7 @@ self.onmessage = async function (e) {
       els.btnStop.disabled = true;
       els.btnGen.disabled = true;
       els.btnTrain.disabled = true;
-      setStatus('Initializing GPU…', 'warn');
+      setStatus('Init GPU…', 'warn');
       appendLog('Booting GPU worker (TensorFlow.js + WebGPU)…', 'info');
       ensureWorker();
       try {
@@ -2249,5 +2375,6 @@ self.onmessage = async function (e) {
     };
   })();
   </script>
+
 </body>
 </html>
