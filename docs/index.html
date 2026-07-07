@@ -1635,6 +1635,8 @@ self.onmessage = async function (e) {
     ids.forEach(id => els[id] = document.getElementById(id));
 
     let worker = null;
+    let workerRestartAttempts = 0;
+    const WORKER_RESTART_LIMIT = 3;
     let busy = false;
     let backendInfo = null;
     let hasModel = false; // true once a model exists in the worker (trained, imported, or restored)
@@ -1982,9 +1984,31 @@ self.onmessage = async function (e) {
       // Attach handlers before sending anything, so no message/error can
       // arrive before we're listening for it.
       worker.onerror = (err) => {
+        // The worker is gone: reusing this same (dead) instance forever
+        // would silently break every future action. Let the next call to
+        // ensureWorker() spin up a fresh one instead.
+        worker = null;
         busy = false;
+        backendInfo = null;
+        // Whatever model existed only in the crashed worker's memory is
+        // gone with it — reflect that immediately instead of leaving
+        // Generate/Export looking available when they'd just fail.
+        hasModel = false;
+        refreshActionButtons();
+        els.btnTrain.disabled = true;
+        // Fail any in-flight request now rather than making it wait out
+        // the 180s timeout in requestWorker().
+        pending.forEach((req) => req.reject(new Error('Worker crashed.')));
+        pending.clear();
         setStatus('Worker error', 'danger');
         appendLog((err && err.message) || 'Worker error', 'error');
+        if (workerRestartAttempts < WORKER_RESTART_LIMIT) {
+          workerRestartAttempts++;
+          appendLog(`Restarting GPU worker (attempt ${workerRestartAttempts}/${WORKER_RESTART_LIMIT})…`, 'warn');
+          ensureWorker();
+        } else {
+          appendLog('GPU worker keeps failing. Reload the page to try again. If you enabled autosave, your last checkpoint is still there after reload.', 'error');
+        }
         console.error(err);
       };
       worker.onmessage = onWorkerMessage;
@@ -2323,6 +2347,7 @@ self.onmessage = async function (e) {
       if (msg.type === 'ready') {
         backendInfo = msg.backend || null;
         if (backendInfo) {
+          workerRestartAttempts = 0;
           els.sBackend.textContent = (backendInfo.backend || 'gpu').toUpperCase();
           els.sBackend.dataset.kind = backendInfo.backend === 'webgpu' ? 'safe' : 'warn';
           if (backendInfo.adapter) {
@@ -2400,6 +2425,12 @@ self.onmessage = async function (e) {
         const req = pending.get(msg.id);
         if (req) {
           pending.delete(msg.id);
+          if (msg.message === 'No model loaded.') {
+            // The worker just told us, authoritatively, that there is no
+            // model in memory — trust it over whatever the UI thought.
+            hasModel = false;
+            refreshActionButtons();
+          }
           req.reject(new Error(msg.message || 'Worker error'));
           return;
         }
