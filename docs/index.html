@@ -838,6 +838,21 @@ self.importScripts(
 // =============================================================================
 // GPU BACKEND — force WebGPU, fallback to WebGL, refuse CPU
 // =============================================================================
+async function assertBackendUsable() {
+  // Force a real 16 KiB upload and compute. Some WebGPU implementations report
+  // themselves as ready but fail as soon as TensorFlow creates a mapped buffer.
+  var probe = null;
+  try {
+    probe = tf.tidy(function () {
+      var matrix = tf.ones([64, 64]);
+      return tf.matMul(matrix, matrix);
+    });
+    await probe.data();
+  } finally {
+    if (probe) probe.dispose();
+  }
+}
+
 async function initGPUBackend() {
   let chosen = null;
   let info = { backend: null, adapter: null, vendor: null, architecture: null };
@@ -848,6 +863,7 @@ async function initGPUBackend() {
       await tf.setBackend('webgpu');
       await tf.ready();
       if (tf.getBackend() === 'webgpu') {
+        await assertBackendUsable();
         chosen = 'webgpu';
         try {
           const adapter = await navigator.gpu.requestAdapter();
@@ -870,6 +886,7 @@ async function initGPUBackend() {
       await tf.setBackend('webgl');
       await tf.ready();
       if (tf.getBackend() === 'webgl') {
+        await assertBackendUsable();
         chosen = 'webgl';
         try {
           const gl = tf.backend().gpgpu && tf.backend().gpgpu.gl;
@@ -901,6 +918,36 @@ async function initGPUBackend() {
     tf.env().set('CHECK_COMPUTATION_FOR_ERRORS', false);
   } catch (_) {}
 
+  return info;
+}
+
+function isWebGPUImplementationError(error) {
+  var message = error && error.message ? error.message : String(error || '');
+  return /GPUDevice|createBuffer|mappedAtCreation|device\\s+lost|WebGPU/i.test(message);
+}
+
+async function fallBackToWebGL(error) {
+  self.postMessage({
+    type: 'log',
+    level: 'warn',
+    message: 'WebGPU became unusable; retrying with WebGL: ' + (error.message || error)
+  });
+  await tf.setBackend('webgl');
+  await tf.ready();
+  if (tf.getBackend() !== 'webgl') throw new Error('WebGL fallback could not be activated.');
+  await assertBackendUsable();
+
+  var info = { backend: 'webgl', adapter: null, vendor: null, architecture: null };
+  try {
+    var gl = tf.backend().gpgpu && tf.backend().gpgpu.gl;
+    var dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    if (gl && dbg) {
+      info.adapter = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || null;
+      info.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) || null;
+    }
+  } catch (_) {}
+  STATE.backendInfo = info;
+  postStatus('ready', { backend: info, memory: postMemoryUsage() });
   return info;
 }
 
@@ -1007,46 +1054,73 @@ function gelu(x) {
   });
 }
 
+var MODEL_SEQUENCE = 0;
+
 function MiniGPT(V, T, C, H, L, dr) {
   if (C % H !== 0) throw new Error('n_embd must be divisible by n_heads');
   this.V = V; this.T = T; this.C = C; this.H = H; this.L = L;
   this.hd = (C / H) | 0;
   this.dr = dr;
+  this.blocks = [];
+  this._mask = null;
+  this._variables = [];
+  this._disposed = false;
 
   var initStd = 0.02;
   var residStd = initStd / Math.sqrt(2 * Math.max(1, L)); // GPT-2 scaled init for residual proj
+  var self = this;
+  var prefix = 'm' + (++MODEL_SEQUENCE) + '_';
 
   function trunc(shape, std) { return tf.truncatedNormal(shape, 0, std); }
-
-  this.wte = tf.variable(trunc([V, C], initStd), true, 'wte');
-  this.wpe = tf.variable(trunc([T, C], initStd), true, 'wpe');
-
-  this.blocks = [];
-  for (var l = 0; l < L; l++) {
-    this.blocks.push({
-      ln1g: tf.variable(tf.ones([C]),  true, 'b' + l + '_ln1g'),
-      ln1b: tf.variable(tf.zeros([C]), true, 'b' + l + '_ln1b'),
-      Wq:   tf.variable(trunc([C, C], initStd), true, 'b' + l + '_Wq'),
-      Wk:   tf.variable(trunc([C, C], initStd), true, 'b' + l + '_Wk'),
-      Wv:   tf.variable(trunc([C, C], initStd), true, 'b' + l + '_Wv'),
-      Wo:   tf.variable(trunc([C, C], residStd), true, 'b' + l + '_Wo'),
-      bo:   tf.variable(tf.zeros([C]), true, 'b' + l + '_bo'),
-      ln2g: tf.variable(tf.ones([C]),  true, 'b' + l + '_ln2g'),
-      ln2b: tf.variable(tf.zeros([C]), true, 'b' + l + '_ln2b'),
-      Wf1:  tf.variable(trunc([C, 4 * C], initStd), true, 'b' + l + '_Wf1'),
-      bf1:  tf.variable(tf.zeros([4 * C]), true, 'b' + l + '_bf1'),
-      Wf2:  tf.variable(trunc([4 * C, C], residStd), true, 'b' + l + '_Wf2'),
-      bf2:  tf.variable(tf.zeros([C]), true, 'b' + l + '_bf2')
-    });
+  function variable(initialValue, trainable, name) {
+    try {
+      var result = tf.variable(initialValue, trainable, prefix + name);
+      self._variables.push(result);
+      return result;
+    } finally {
+      initialValue.dispose();
+    }
   }
 
-  this.lnFg  = tf.variable(tf.ones([C]),  true, 'lnFg');
-  this.lnFb  = tf.variable(tf.zeros([C]), true, 'lnFb');
-  this.head  = tf.variable(trunc([C, V], initStd), true, 'head');
-  this.bhead = tf.variable(tf.zeros([V]), true, 'bhead');
+  try {
+    this.wte = variable(trunc([V, C], initStd), true, 'wte');
+    this.wpe = variable(trunc([T, C], initStd), true, 'wpe');
 
-  // Persistent causal mask, shape [T, T] (1 lower-tri, 0 upper-tri).
-  this._mask = tf.keep(tf.linalg.bandPart(tf.ones([T, T]), -1, 0));
+    for (var l = 0; l < L; l++) {
+      this.blocks.push({
+        ln1g: variable(tf.ones([C]),  true, 'b' + l + '_ln1g'),
+        ln1b: variable(tf.zeros([C]), true, 'b' + l + '_ln1b'),
+        Wq:   variable(trunc([C, C], initStd), true, 'b' + l + '_Wq'),
+        Wk:   variable(trunc([C, C], initStd), true, 'b' + l + '_Wk'),
+        Wv:   variable(trunc([C, C], initStd), true, 'b' + l + '_Wv'),
+        Wo:   variable(trunc([C, C], residStd), true, 'b' + l + '_Wo'),
+        bo:   variable(tf.zeros([C]), true, 'b' + l + '_bo'),
+        ln2g: variable(tf.ones([C]),  true, 'b' + l + '_ln2g'),
+        ln2b: variable(tf.zeros([C]), true, 'b' + l + '_ln2b'),
+        Wf1:  variable(trunc([C, 4 * C], initStd), true, 'b' + l + '_Wf1'),
+        bf1:  variable(tf.zeros([4 * C]), true, 'b' + l + '_bf1'),
+        Wf2:  variable(trunc([4 * C, C], residStd), true, 'b' + l + '_Wf2'),
+        bf2:  variable(tf.zeros([C]), true, 'b' + l + '_bf2')
+      });
+    }
+
+    this.lnFg  = variable(tf.ones([C]),  true, 'lnFg');
+    this.lnFb  = variable(tf.zeros([C]), true, 'lnFb');
+    this.head  = variable(trunc([C, V], initStd), true, 'head');
+    this.bhead = variable(tf.zeros([V]), true, 'bhead');
+
+    // Persistent causal mask, shape [T, T] (1 lower-tri, 0 upper-tri).
+    this._mask = tf.tidy(function () {
+      return tf.linalg.bandPart(tf.ones([T, T]), -1, 0);
+    });
+  } catch (err) {
+    for (var i = 0; i < this._variables.length; i++) this._variables[i].dispose();
+    this._variables = [];
+    if (this._mask) this._mask.dispose();
+    this._mask = null;
+    this._disposed = true;
+    throw err;
+  }
 }
 
 MiniGPT.prototype.forward = function (idx, training) {
@@ -1135,9 +1209,12 @@ MiniGPT.prototype.countParams = function () {
 };
 
 MiniGPT.prototype.dispose = function () {
-  var vs = this.trainables();
-  for (var i = 0; i < vs.length; i++) vs[i].dispose();
+  if (this._disposed) return;
+  this._disposed = true;
+  for (var i = 0; i < this._variables.length; i++) this._variables[i].dispose();
+  this._variables = [];
   if (this._mask) this._mask.dispose();
+  this._mask = null;
 };
 
 // =============================================================================
@@ -1148,8 +1225,26 @@ function AdamW(params, lr, b1, b2, eps, weightDecay) {
   this.lr = lr; this.b1 = b1 || 0.9; this.b2 = b2 || 0.95;
   this.eps = eps || 1e-8; this.wd = weightDecay || 0.0;
   this.t = 0;
-  this.m = params.map(function (p) { return tf.variable(tf.zerosLike(p), false); });
-  this.v = params.map(function (p) { return tf.variable(tf.zerosLike(p), false); });
+  this.m = [];
+  this.v = [];
+  function slotFor(param) {
+    var initialValue = tf.zerosLike(param);
+    try {
+      return tf.variable(initialValue, false);
+    } finally {
+      initialValue.dispose();
+    }
+  }
+  try {
+    for (var slotIndex = 0; slotIndex < params.length; slotIndex++) this.m.push(slotFor(params[slotIndex]));
+    for (var valueIndex = 0; valueIndex < params.length; valueIndex++) this.v.push(slotFor(params[valueIndex]));
+  } catch (err) {
+    for (var mIndex = 0; mIndex < this.m.length; mIndex++) this.m[mIndex].dispose();
+    for (var vIndex = 0; vIndex < this.v.length; vIndex++) this.v[vIndex].dispose();
+    this.m = [];
+    this.v = [];
+    throw err;
+  }
   // Avoid weight decay on biases / LN params (size 1D)
   this._noWD = params.map(function (p) {
     var n = (p.name || '').toLowerCase();
@@ -1216,7 +1311,23 @@ AdamW.prototype.step = function (grads, gradClip) {
 AdamW.prototype.dispose = function () {
   for (var i = 0; i < this.m.length; i++) this.m[i].dispose();
   for (var i = 0; i < this.v.length; i++) this.v[i].dispose();
+  this.m = [];
+  this.v = [];
 };
+
+function createTrainingObjects(V, T, C, H, L, dropout, lr, weightDecay) {
+  var model = null;
+  var optimizer = null;
+  try {
+    model = new MiniGPT(V, T, C, H, L, dropout);
+    optimizer = new AdamW(model.trainables(), lr, 0.9, 0.95, 1e-8, weightDecay);
+    return { model: model, optimizer: optimizer };
+  } catch (err) {
+    if (optimizer) optimizer.dispose();
+    if (model) model.dispose();
+    throw err;
+  }
+}
 
 // =============================================================================
 // CHECKPOINTING
@@ -1487,8 +1598,35 @@ async function trainAsync(payload) {
   STATE.model = null;
   STATE.optimizer = null;
 
-  var model = new MiniGPT(vocabData.vocab.length, blockSize, nEmbd, nHeads, nLayers, dropout);
-  var optimizer = new AdamW(model.trainables(), lrStart, 0.9, 0.95, 1e-8, wd);
+  var trainingObjects;
+  try {
+    trainingObjects = createTrainingObjects(
+      vocabData.vocab.length, blockSize, nEmbd, nHeads, nLayers, dropout, lrStart, wd
+    );
+  } catch (allocationError) {
+    if (STATE.backendInfo.backend === 'webgpu' && isWebGPUImplementationError(allocationError)) {
+      try {
+        await fallBackToWebGL(allocationError);
+        trainingObjects = createTrainingObjects(
+          vocabData.vocab.length, blockSize, nEmbd, nHeads, nLayers, dropout, lrStart, wd
+        );
+      } catch (fallbackError) {
+        postStatus('error', {
+          message: 'Model allocation failed on WebGPU and WebGL: ' + (fallbackError.message || fallbackError),
+          hasModel: false
+        });
+        return;
+      }
+    } else {
+      postStatus('error', {
+        message: 'Model allocation failed: ' + (allocationError.message || allocationError),
+        hasModel: false
+      });
+      return;
+    }
+  }
+  var model = trainingObjects.model;
+  var optimizer = trainingObjects.optimizer;
 
   STATE.tokenizer  = mode;
   STATE.config     = {
@@ -1537,15 +1675,16 @@ async function trainAsync(payload) {
         tgBuf[bi * blockSize + k] = indices[start + k + 1];
       }
     }
-    var inputs = tf.tensor2d(inBuf, [batch, blockSize], 'int32');
-    var targets = tf.tensor2d(tgBuf, [batch, blockSize], 'int32');
-
     var lr = lrSchedule(step - 1, steps, warmup, lrStart, lrEnd);
     optimizer.lr = lr;
 
     var lossVal;
     var grads = null;
+    var inputs = null;
+    var targets = null;
     try {
+      inputs = tf.tensor2d(inBuf, [batch, blockSize], 'int32');
+      targets = tf.tensor2d(tgBuf, [batch, blockSize], 'int32');
       grads = tf.variableGrads(function () {
         return model.lossAndLogits(inputs, targets);
       }, model.trainables());
@@ -1558,8 +1697,8 @@ async function trainAsync(payload) {
         grads.value.dispose();
         Object.keys(grads.grads).forEach(function (key) { grads.grads[key].dispose(); });
       }
-      inputs.dispose();
-      targets.dispose();
+      if (inputs) inputs.dispose();
+      if (targets) targets.dispose();
     }
     if (trainingFailure) break;
 
