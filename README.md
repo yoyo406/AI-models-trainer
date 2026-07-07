@@ -4,6 +4,10 @@ A minimal GPT-style decoder transformer that runs **entirely in the browser** us
 
 No backend. No server. Just your browser, your GPU, and questionable life choices.
 
+The app has no build step. Serve the `docs/` directory over HTTP(S) and open
+`index.html`; opening it directly with `file://` works in some browsers but
+disables service-worker caching.
+
 ---
 
 ## ✨ Features
@@ -72,7 +76,7 @@ Training runs off the main thread via a real Web Worker when the browser allows 
 ## 💾 Checkpoints
 
 - Export model → JSON file
-- Import model → restore training or generate
+- Import model → restore it for generation or export
 - Autosave → stored in IndexedDB
 
 ⚠️ Only **schema v3** checkpoints are supported.
@@ -91,6 +95,7 @@ Training runs off the main thread via a real Web Worker when the browser allows 
 ## 🛠️ Technical Details
 
 - Framework: TensorFlow.js
+- Runtime dependency: TensorFlow.js 4.22.0, pinned on jsDelivr
 - Backend:
   - WebGPU (preferred)
   - WebGL (fallback)
@@ -126,6 +131,7 @@ Training runs off the main thread via a real Web Worker when the browser allows 
 ## 📌 Notes
 
 - Training large models in-browser is experimental
+- The TensorFlow.js runtime is loaded from jsDelivr, so the first load requires network access
 - Expect crashes if you push it too far
 - This is for learning and experimentation, not production
 
@@ -133,7 +139,7 @@ Training runs off the main thread via a real Web Worker when the browser allows 
 
 ## 📜 License
 
-MIT License
+Apache License 2.0
 
 ---
 
