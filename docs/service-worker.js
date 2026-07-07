@@ -3,14 +3,16 @@
  * Strategy: Cache-first for assets, network-first for HTML
  */
 
-const CACHE_NAME = 'gptjs-v1';
+// v2: 'apple-touch-icon.png' was listed here but never existed in the repo.
+// cache.addAll() rejects the *entire* install if a single asset 404s, so the
+// service worker never precached anything and offline mode never worked.
+const CACHE_NAME = 'gptjs-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/icon-512.png'
 ];
 
 // ── INSTALL: pre-cache all static assets ──────────────────────────────────

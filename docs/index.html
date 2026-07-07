@@ -28,8 +28,10 @@
 
   --label:           #ffffff;
   --label-secondary: rgba(235,235,245,0.60);
-  --label-tertiary:  rgba(235,235,245,0.30);
-  --label-quat:      rgba(235,235,245,0.16);
+  /* 0.30 measured at ~2.25:1 contrast on black (fails WCAG AA 4.5:1 for text).
+     0.50 measures ~4.61:1 on black, the worst-case background in this UI
+     (real card backgrounds are lighter, so actual contrast is only higher). */
+  --label-tertiary:  rgba(235,235,245,0.50);
   --on-accent:       #ffffff;
 
   /* Apple system colors dark */
@@ -300,6 +302,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 }
 .dropzone:hover { color: var(--label); background: var(--fill-3); }
 .dropzone.dragover { color: var(--accent); background: var(--accent-tint); border-bottom-color: var(--accent); }
+.dropzone:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); background: var(--fill-3); }
 .upload-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; }
 
 /* ---------- BUTTONS ------------------------------------------------------- */
@@ -481,6 +484,7 @@ canvas {
 .tab-item.active { color: var(--accent); }
 .tab-item.active svg { transform: scale(1.06); }
 .tab-item:active svg { transform: scale(0.90); }
+.tab-item:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-tint), 0 0 0 3px var(--accent); border-radius: var(--r-sm); }
 
 /* ---------- PANELS --------------------------------------------------------- */
 .panel { display: none; }
@@ -511,7 +515,7 @@ body { padding-bottom: 90px; }
           <h1>transformer.js</h1>
           <p>Decoder transformer · TensorFlow.js · WebGPU/WebGL · GPU-only · autosave IndexedDB</p>
         </div>
-        <div id="statusPill" class="status-pill" data-kind="safe">Init…</div>
+        <div id="statusPill" class="status-pill" data-kind="safe" role="status" aria-live="polite">Init…</div>
       </div>
     </div>
 
@@ -531,7 +535,7 @@ The sea is calm under a clear blue sky.
 The teacher explains the lesson carefully.
 A train crosses the bridge at dusk.</textarea>
           <div class="upload">
-            <div id="dropZone" class="dropzone">Drop a .txt file here or tap to choose</div>
+            <div id="dropZone" class="dropzone" role="button" tabindex="0" aria-label="Drop a .txt file here, or press Enter to choose a file">Drop a .txt file here or tap to choose</div>
             <div class="upload-row">
               <label for="txtFile" class="upload-btn">Choose .txt file</label>
               <div id="fileName" class="file-name">No file chosen</div>
@@ -568,7 +572,7 @@ A train crosses the bridge at dusk.</textarea>
                 <option value="word">word</option>
               </select>
             </div>
-            <div class="field"><label for="topK">top-k</label><input id="topK" class="input" type="number" min="0" max="1000" value="0"></div>
+            <div class="field"><label for="topK">top-k</label><input id="topK" class="input" type="number" min="0" max="1000" value="0" title="0 = disabled (no top-k cutoff)"></div>
             <div class="field"><label for="topP">top-p</label><input id="topP" class="input" type="number" min="0.1" max="1" step="0.01" value="0.95"></div>
             <div class="field"><label for="patience">patience</label><input id="patience" class="input" type="number" min="1" max="10000" value="400"></div>
             <div class="field"><label for="minDelta">min delta</label><input id="minDelta" class="input" type="number" min="0" max="1" step="0.0005" value="0.001"></div>
@@ -589,7 +593,7 @@ A train crosses the bridge at dusk.</textarea>
             <button id="btnBalancedPreset" class="btn">Balanced preset</button>
             <button id="btnMaxPreset" class="btn">Max preset</button>
           </div>
-          <div class="note">L'entraînement se fait dans un Web Worker, sur le GPU. Si aucun backend GPU n'est disponible (ni WebGPU ni WebGL), le worker refuse de démarrer.</div>
+          <div class="note">Training runs off the main thread when possible (falls back to same-thread execution if Web Workers are unavailable), forced onto the GPU. If no GPU backend is available (neither WebGPU nor WebGL), it refuses to start.</div>
         </section>
 
         <section class="card">
@@ -625,12 +629,12 @@ A train crosses the bridge at dusk.</textarea>
           <div class="metric" style="margin-top:12px;">
             <div class="k">tokenizer</div><div id="sTokenCount" class="v small">char</div>
           </div>
-          <div class="note">L'entraînement est forcé sur GPU. WebGPU est privilégié, WebGL est utilisé en fallback. Le CPU est explicitement refusé.</div>
+          <div class="note">Training is forced onto the GPU. WebGPU is preferred, WebGL is used as fallback. CPU execution is explicitly refused.</div>
         </section>
 
         <section class="card">
           <h2>Log</h2>
-          <div id="log" class="log">
+          <div id="log" class="log" role="log" aria-live="polite">
             <div class="log-line">ready.</div>
           </div>
         </section>
@@ -659,7 +663,7 @@ A train crosses the bridge at dusk.</textarea>
             <div class="btns">
               <button id="btnGen" class="btn primary" disabled>Generate</button>
             </div>
-            <div id="output" class="output empty">-- train the model first --</div>
+            <div id="output" class="output empty" role="status" aria-live="polite">-- train the model first --</div>
           </div>
         </section>
 
@@ -674,7 +678,7 @@ A train crosses the bridge at dusk.</textarea>
           </div>
           <input id="modelFile" type="file" accept=".json,application/json" hidden>
           <div class="footer-note">
-            Checkpoints portables (JSON). Le format a changé pour stocker les poids du modèle TF.js (schema 3) — les anciens checkpoints v2 ne sont plus compatibles.
+            Portable checkpoints (JSON). The format stores TensorFlow.js model weights (schema 3) — older v2 checkpoints are not compatible.
           </div>
         </section>
       </div>
@@ -1529,6 +1533,7 @@ self.onmessage = async function (e) {
     let worker = null;
     let busy = false;
     let backendInfo = null;
+    let hasModel = false; // true once a model exists in the worker (trained, imported, or restored)
     let currentRequestId = 0;
     const pending = new Map();
     let lossHist = [];
@@ -1739,8 +1744,10 @@ self.onmessage = async function (e) {
         topK: els.topK.value, topP: els.topP.value, seed: els.seed.value,
         genLen: els.genLen.value, temp: els.tempR.value,
         patience: els.patience.value, minDelta: els.minDelta.value,
-        autosave: els.autosave.checked, autosaveEvery: els.autosaveEvery.value,
-        data: els.data.value
+        autosave: els.autosave.checked, autosaveEvery: els.autosaveEvery.value
+        // Training text is intentionally NOT stored here — see saveTrainingTextDebounced().
+        // A large pasted corpus could exceed localStorage's ~5MB quota and silently
+        // fail the whole settings save (setItem throws for the entire payload).
       };
       try { localStorage.setItem('gptjs.settings', JSON.stringify(payload)); } catch (_) {}
     }
@@ -1751,13 +1758,21 @@ self.onmessage = async function (e) {
         const cfg = JSON.parse(raw);
         if (!cfg || typeof cfg !== 'object') return;
         setConfig(cfg);
-        if (typeof cfg.data === 'string' && cfg.data.trim()) els.data.value = cfg.data;
+        // One-time migration: older versions of this app stored the training
+        // text in localStorage directly (cfg.data). Restore it once, then let
+        // it move to IndexedDB going forward — it's no longer written here.
+        if (typeof cfg.data === 'string' && cfg.data.trim()) {
+          els.data.value = cfg.data;
+          saveTrainingText(cfg.data);
+        }
         updateSafetyUI();
       } catch (_) {}
     }
 
 
-    // ===== FakeWorker: runs worker source on main thread (blob: blocked in sandbox) =====
+    // ===== FakeWorker: fallback that runs the worker source on the main
+    // thread, used only when a real Worker cannot be created (e.g. a CSP
+    // that blocks blob: workers). See createWorker() below. =====
     class FakeWorker {
       constructor(source) {
         // Strip importScripts — tf is already loaded in <head>
@@ -1788,14 +1803,19 @@ self.onmessage = async function (e) {
         };
         this._self = fakeSelf;
 
-        try {
-          // eslint-disable-next-line no-new-func
-          const fn = new Function('self', clean);
-          fn(fakeSelf);
-        } catch (e) {
-          if (this.onerror) this.onerror(e);
-          console.error('FakeWorker init error:', e);
-        }
+        // Defer script evaluation so the caller can attach `.onerror` /
+        // `.onmessage` right after `new FakeWorker(...)` returns — exactly
+        // like a real Worker, which only ever reports errors asynchronously.
+        setTimeout(() => {
+          try {
+            // eslint-disable-next-line no-new-func
+            const fn = new Function('self', clean);
+            fn(fakeSelf);
+          } catch (e) {
+            if (worker.onerror) worker.onerror(e);
+            console.error('FakeWorker init error:', e);
+          }
+        }, 0);
       }
 
       postMessage(msg) {
@@ -1826,19 +1846,41 @@ self.onmessage = async function (e) {
     }
 
     // ----- Worker plumbing -----
+    // Tries a real off-main-thread Worker first (works on a plain GitHub
+    // Pages deployment). Falls back to FakeWorker if the environment
+    // disallows it (e.g. a restrictive CSP blocking blob: workers).
+    function createWorker(source) {
+      try {
+        const blob = new Blob([source], { type: 'application/javascript' });
+        const url = URL.createObjectURL(blob);
+        const realWorker = new Worker(url);
+        realWorker.__isRealWorker = true;
+        URL.revokeObjectURL(url); // safe once the Worker has started loading it
+        return realWorker;
+      } catch (e) {
+        console.warn('Real Web Worker unavailable, falling back to same-thread execution:', e);
+        const fake = new FakeWorker(source);
+        fake.__isRealWorker = false;
+        return fake;
+      }
+    }
     function ensureWorker() {
       if (worker) return worker;
-      worker = new FakeWorker(WORKER_SOURCE);
-      worker.onmessage = onWorkerMessage;
+      worker = createWorker(WORKER_SOURCE);
+      // Attach handlers before sending anything, so no message/error can
+      // arrive before we're listening for it.
       worker.onerror = (err) => {
         busy = false;
         setStatus('Worker error', 'danger');
-        appendLog(err.message || 'Worker error', 'error');
+        appendLog((err && err.message) || 'Worker error', 'error');
         console.error(err);
       };
-      // Initialize backend
+      worker.onmessage = onWorkerMessage;
       worker.postMessage({ type: 'init' });
       setStatus('Init GPU…', 'warn');
+      appendLog(worker.__isRealWorker
+        ? 'Training will run off the main thread (Web Worker).'
+        : 'Web Workers unavailable in this environment — training will run on the main thread.', 'info');
       return worker;
     }
     function postToWorker(msg) {
@@ -1918,6 +1960,44 @@ self.onmessage = async function (e) {
       }
     }
 
+    // ----- Training text persistence (IndexedDB, not localStorage) -----
+    // The training text can be arbitrarily large (a pasted book, a big
+    // corpus...). localStorage has a ~5MB total quota per origin and throws
+    // on the whole write if exceeded, so it's kept out of `gptjs.settings`
+    // and stored here instead, reusing the autosave database's 'state' store.
+    async function saveTrainingText(text) {
+      try {
+        const db = await openAutosaveDB();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction('state', 'readwrite');
+          tx.objectStore('state').put(text, 'trainingText');
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error || new Error('Save failed'));
+        });
+      } catch (_) {
+        // Non-fatal: the text is still in the textarea for this session.
+      }
+    }
+    let trainingTextTimer = null;
+    function saveTrainingTextDebounced() {
+      clearTimeout(trainingTextTimer);
+      trainingTextTimer = setTimeout(() => saveTrainingText(els.data.value), 400);
+    }
+    async function loadTrainingText() {
+      try {
+        const db = await openAutosaveDB();
+        const text = await new Promise((resolve, reject) => {
+          const tx = db.transaction('state', 'readonly');
+          const req = tx.objectStore('state').get('trainingText');
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error || new Error('Load failed'));
+        });
+        return typeof text === 'string' ? text : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
     // ----- UI updates -----
     function updateStatsBox(payload) {
       if (payload.vocabSize != null) els.sVocab.textContent = String(payload.vocabSize);
@@ -1948,6 +2028,17 @@ self.onmessage = async function (e) {
       return data.slice(0, 8) || '';
     }
 
+    // ----- Model availability -----
+    // Single source of truth for buttons that require a trained/imported model.
+    // Replaces several scattered (and previously inconsistent) disabled-state
+    // assignments that could leave Generate/Export in the wrong state after
+    // an error (see audit item I1).
+    function refreshActionButtons() {
+      els.btnGen.disabled = busy || !hasModel;
+      els.btnExportModel.disabled = !hasModel;
+      els.btnClearModel.disabled = !hasModel;
+    }
+
     // ----- Actions -----
     async function startTraining() {
       if (!backendInfo) {
@@ -1958,6 +2049,11 @@ self.onmessage = async function (e) {
       const cfg = readConfig();
       if (!text.trim()) {
         appendLog('Training text is empty.', 'warn');
+        return;
+      }
+      const LARGE_TEXT_THRESHOLD = 2_000_000; // ~2M characters
+      if (text.length > LARGE_TEXT_THRESHOLD &&
+          !confirm(`This is a large training text (~${fmtNum(text.length)} characters). Tokenizing and training it may take a while and use significant memory. Continue?`)) {
         return;
       }
       const tier = getDeviceTier();
@@ -1971,7 +2067,7 @@ self.onmessage = async function (e) {
       drawLossGraph(lossHist);
       els.btnTrain.disabled = true;
       els.btnStop.disabled = false;
-      els.btnGen.disabled = true;
+      refreshActionButtons();
       setStatus('Training on ' + (backendInfo.backend || 'gpu').toUpperCase(), 'warn');
       appendLog(`Training started · backend=${backendInfo.backend} · tokenizer=${cfg.tokenizer} · risk=${risk}`, 'info');
 
@@ -2010,7 +2106,8 @@ self.onmessage = async function (e) {
       appendLog('Model reset.', 'warn');
       els.btnTrain.disabled = !backendInfo;
       els.btnStop.disabled = true;
-      els.btnGen.disabled = true;
+      hasModel = false;
+      refreshActionButtons();
     }
 
     async function generateText() {
@@ -2074,7 +2171,8 @@ self.onmessage = async function (e) {
       if (checkpoint.config) setConfig(checkpoint.config);
       if (payload.vocabSize != null) els.sVocab.textContent = String(payload.vocabSize);
       if (payload.params != null) els.sParams.textContent = fmtNum(payload.params);
-      els.btnGen.disabled = false;
+      hasModel = true;
+      refreshActionButtons();
       appendLog('Model imported.', 'ok');
       setStatus('Ready', 'safe');
     }
@@ -2092,7 +2190,8 @@ self.onmessage = async function (e) {
       if (checkpoint.config) setConfig(checkpoint.config);
       if (payload.vocabSize != null) els.sVocab.textContent = String(payload.vocabSize);
       if (payload.params != null) els.sParams.textContent = fmtNum(payload.params);
-      els.btnGen.disabled = false;
+      hasModel = true;
+      refreshActionButtons();
       appendLog('Autosave restored.', 'ok');
     }
 
@@ -2101,7 +2200,8 @@ self.onmessage = async function (e) {
       lastCheckpoint = null;
       try { await requestWorker('reset', {}); } catch (_) { postToWorker({ type: 'reset' }); }
       resetUIOnly();
-      els.btnGen.disabled = true;
+      hasModel = false;
+      refreshActionButtons();
       appendLog('Model cleared.', 'warn');
     }
 
@@ -2152,7 +2252,8 @@ self.onmessage = async function (e) {
         busy = false;
         els.btnTrain.disabled = !backendInfo;
         els.btnStop.disabled = true;
-        els.btnGen.disabled = false;
+        hasModel = !!msg.checkpoint;
+        refreshActionButtons();
         if (msg.checkpoint) {
           lastCheckpoint = msg.checkpoint;
           if (els.autosave.checked) saveAutosave(msg.checkpoint);
@@ -2173,7 +2274,8 @@ self.onmessage = async function (e) {
         if (msg.type === 'imported') {
           if (msg.params != null) els.sParams.textContent = fmtNum(msg.params);
           if (msg.vocabSize != null) els.sVocab.textContent = String(msg.vocabSize);
-          els.btnGen.disabled = false;
+          hasModel = true;
+          refreshActionButtons();
         }
         if (msg.type === 'reset') setStatus('Ready', 'safe');
         return;
@@ -2192,7 +2294,7 @@ self.onmessage = async function (e) {
         busy = false;
         els.btnTrain.disabled = !backendInfo;
         els.btnStop.disabled = true;
-        els.btnGen.disabled = !!backendInfo;
+        refreshActionButtons();
         setStatus('Error', 'danger');
         appendLog(msg.message || 'Worker error', 'error');
       }
@@ -2216,12 +2318,19 @@ self.onmessage = async function (e) {
           name.textContent = file.name;
           updateSafetyUI();
           saveSettingsDebounced();
+          saveTrainingTextDebounced();
           appendLog(`Loaded ${file.name}.`, 'ok');
         };
         reader.readAsText(file);
       }
       input.addEventListener('change', () => loadFile(input.files && input.files[0]));
       zone.addEventListener('click', () => input.click());
+      zone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          input.click();
+        }
+      });
       zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
       zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
       zone.addEventListener('drop', (e) => {
@@ -2310,6 +2419,7 @@ self.onmessage = async function (e) {
           }
           updateSafetyUI();
           saveSettingsDebounced();
+          if (id === 'data') saveTrainingTextDebounced();
         });
       });
 
@@ -2352,13 +2462,18 @@ self.onmessage = async function (e) {
       drawLossGraph(lossHist);
       els.seed.value = '';
       els.btnStop.disabled = true;
-      els.btnGen.disabled = true;
       els.btnTrain.disabled = true;
+      refreshActionButtons();
       setStatus('Init GPU…', 'warn');
       appendLog('Booting GPU worker (TensorFlow.js + WebGPU)…', 'info');
       ensureWorker();
       try {
         await openAutosaveDB();
+        const savedText = await loadTrainingText();
+        if (typeof savedText === 'string' && savedText.trim()) {
+          els.data.value = savedText;
+          updateSafetyUI();
+        }
         const checkpoint = await loadAutosave();
         if (checkpoint) appendLog('Autosave available. Use restore autosave to load it.', 'info');
       } catch (_) {}
