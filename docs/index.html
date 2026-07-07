@@ -6,6 +6,9 @@
 <meta name="theme-color" content="#080808">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>transformer.js · gpu</title>
 <style>
 /* =============================================================================
@@ -72,6 +75,13 @@
 
 * { box-sizing: border-box; }
 html { color-scheme: dark; }
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
 
 body {
   margin: 0;
@@ -208,13 +218,6 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .status-pill[data-kind="danger"]::before { background: var(--red); }
 
 /* ---------- LAYOUT -------------------------------------------------------- */
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0,1.5fr) minmax(300px,.9fr);
-  gap: 16px;
-  align-items: start;
-}
-@media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
 .grid { display: grid; gap: 16px; }
 
 /* ---------- CARDS --------------------------------------------------------- */
@@ -437,7 +440,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 }
 .metric .v.small { font-size: 13px; font-weight: 510; letter-spacing: -0.01em; }
 .metric .v[data-kind="safe"]   { color: var(--green); }
-.metric .v[data-kind="warn"]   { color: var(--orange); }
+.metric .v[data-kind="warn"],
+.metric .v[data-kind="warning"] { color: var(--orange); }
 .metric .v[data-kind="danger"] { color: var(--red); }
 
 /* ---------- PROGRESS ------------------------------------------------------ */
@@ -602,15 +606,16 @@ body { padding-bottom: 90px; }
           <h1>transformer.js</h1>
           <p>Decoder transformer · TensorFlow.js · WebGPU/WebGL · GPU-only · autosave IndexedDB</p>
         </div>
-        <div id="statusPill" class="status-pill" data-kind="safe" role="status" aria-live="polite">Init…</div>
+        <div id="statusPill" class="status-pill" data-kind="warn" role="status" aria-live="polite">Init…</div>
       </div>
     </div>
 
     <!-- ═══ DATA PANEL ═══ -->
-    <div id="panelData" class="panel active">
+    <div id="panelData" class="panel active" role="tabpanel" aria-labelledby="tabData">
       <div class="grid">
         <section class="card">
           <h2>Training Data</h2>
+          <label class="sr-only" for="data">Training data</label>
           <textarea id="data" class="textarea" spellcheck="false">A small fox jumps over the lazy dog.
 The moon shines above the quiet city.
 Wind moves softly through the trees.
@@ -625,7 +630,7 @@ A train crosses the bridge at dusk.</textarea>
             <div id="dropZone" class="dropzone" role="button" tabindex="0" aria-label="Drop a .txt file here, or press Enter to choose a file">Drop a .txt file here or tap to choose</div>
             <div class="upload-row">
               <label for="txtFile" class="upload-btn">Choose .txt file</label>
-              <div id="fileName" class="file-name">No file chosen</div>
+              <div id="fileName" class="file-name" aria-live="polite">No file chosen</div>
             </div>
             <input id="txtFile" type="file" accept=".txt,text/plain" hidden>
           </div>
@@ -635,7 +640,7 @@ A train crosses the bridge at dusk.</textarea>
     </div>
 
     <!-- ═══ TRAIN PANEL ═══ -->
-    <div id="panelTrain" class="panel">
+    <div id="panelTrain" class="panel" role="tabpanel" aria-labelledby="tabTrain" hidden>
       <div class="layout-train">
         <div class="grid">
         <section class="card">
@@ -702,8 +707,8 @@ A train crosses the bridge at dusk.</textarea>
 
         <section class="card">
           <h2>Training</h2>
-          <canvas id="cvs" width="1200" height="360"></canvas>
-          <div class="progress-wrap"><div id="pbar" class="progress"></div></div>
+          <canvas id="cvs" width="1200" height="360" role="img" aria-label="Training loss graph">Training loss graph</canvas>
+          <div id="trainingProgress" class="progress-wrap" role="progressbar" aria-label="Training progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="pbar" class="progress"></div></div>
           <div class="status-grid">
             <div class="metric"><div class="k">vocab</div><div id="sVocab" class="v">--</div></div>
             <div class="metric"><div class="k">params</div><div id="sParams" class="v">--</div></div>
@@ -718,7 +723,7 @@ A train crosses the bridge at dusk.</textarea>
 
         </div><!-- /left col train -->
         <aside class="grid">
-        <section id="sectionSafety" class="card">
+        <section class="card">
           <h2>GPU &amp; Safety</h2>
           <div class="metric" style="margin-bottom:12px;">
             <div class="k">backend</div><div id="sBackend" class="v small">--</div>
@@ -747,8 +752,8 @@ A train crosses the bridge at dusk.</textarea>
     </div><!-- /panelTrain -->
 
     <!-- ═══ CHAT PANEL ═══ -->
-    <div id="panelChat" class="panel">
-      <div class="grid" id="chatPanelContent">
+    <div id="panelChat" class="panel" role="tabpanel" aria-labelledby="tabChat" hidden>
+      <div class="grid">
 <section class="card">
           <h2>Generation</h2>
           <div class="section-tight">
@@ -780,12 +785,11 @@ A train crosses the bridge at dusk.</textarea>
             <button id="btnClearAutosave" class="btn">Clear autosave</button>
             <button id="btnClearModel" class="btn danger">Clear model</button>
           </div>
-          <input id="modelFile" type="file" accept=".json,application/json" hidden>
+          <input id="modelFile" type="file" accept=".json,application/json" aria-label="Import checkpoint file" hidden>
           <div class="footer-note">
             Portable checkpoints (JSON). The format stores TensorFlow.js model weights (schema 3) — older v2 checkpoints are not compatible.
           </div>
         </section>
-      </div>
       </div>
     </div>
 
@@ -793,8 +797,8 @@ A train crosses the bridge at dusk.</textarea>
 
   <!-- ═══ iOS TAB BAR ═══ -->
   <nav class="tab-bar" role="tablist">
-    <button class="tab-item active" data-panel="panelData" role="tab" aria-selected="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <button id="tabData" class="tab-item active" data-panel="panelData" role="tab" aria-controls="panelData" aria-selected="true" tabindex="0">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
         <polyline points="14 2 14 8 20 8"/>
         <line x1="16" y1="13" x2="8" y2="13"/>
@@ -803,14 +807,14 @@ A train crosses the bridge at dusk.</textarea>
       </svg>
       Data
     </button>
-    <button class="tab-item" data-panel="panelTrain" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <button id="tabTrain" class="tab-item" data-panel="panelTrain" role="tab" aria-controls="panelTrain" aria-selected="false" tabindex="-1">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>
       Train
     </button>
-    <button class="tab-item" data-panel="panelChat" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <button id="tabChat" class="tab-item" data-panel="panelChat" role="tab" aria-controls="panelChat" aria-selected="false" tabindex="-1">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
       </svg>
       Chat
@@ -907,6 +911,19 @@ function normalizeText(text) {
   return String(text || '').replace(/\\r\\n/g, '\\n').replace(/\\r/g, '\\n');
 }
 
+function finiteNumber(value, fallback) {
+  var n = Number(value);
+  return isFinite(n) ? n : fallback;
+}
+
+function clampNumber(value, fallback, min, max) {
+  return Math.min(max, Math.max(min, finiteNumber(value, fallback)));
+}
+
+function clampInteger(value, fallback, min, max) {
+  return Math.round(clampNumber(value, fallback, min, max));
+}
+
 function tokenizeText(text, mode) {
   text = normalizeText(text);
   if (mode === 'word') {
@@ -941,7 +958,7 @@ function buildVocabulary(text, mode) {
   for (var k = 0; k < tokens.length; k++) {
     indices[k] = tokenToIdx[tokens[k]] != null ? tokenToIdx[tokens[k]] : 0;
   }
-  return { tokens: tokens, vocab: vocab, tokenToIdx: tokenToIdx, idxToToken: idxToToken, indices: indices };
+  return { vocab: vocab, tokenToIdx: tokenToIdx, idxToToken: idxToToken, indices: indices };
 }
 
 function sampleFromDistribution(probs, topK, topP) {
@@ -1227,6 +1244,83 @@ async function tensorsToPlain(model) {
   };
 }
 
+function validateCheckpoint(checkpoint) {
+  if (!checkpoint || typeof checkpoint !== 'object' || Array.isArray(checkpoint)) {
+    throw new Error('Invalid checkpoint: expected an object.');
+  }
+  if (checkpoint.schema !== 3) {
+    throw new Error('Unsupported checkpoint schema. Only schema 3 is supported.');
+  }
+  var plain = checkpoint.model;
+  if (!plain || typeof plain !== 'object' || Array.isArray(plain)) {
+    throw new Error('Invalid checkpoint: model is missing.');
+  }
+
+  function dimension(value, min, max, name) {
+    if (!Number.isInteger(value) || value < min || value > max) {
+      throw new Error('Invalid checkpoint dimension: ' + name + '.');
+    }
+    return value;
+  }
+  function numericArray(value, expected, name) {
+    if (!Array.isArray(value) || value.length !== expected) {
+      throw new Error('Invalid checkpoint tensor: ' + name + '.');
+    }
+    for (var i = 0; i < value.length; i++) {
+      if (typeof value[i] !== 'number' || !isFinite(value[i])) {
+        throw new Error('Invalid checkpoint value in ' + name + '.');
+      }
+    }
+  }
+
+  var V = dimension(plain.V, 2, 262144, 'vocab size');
+  var T = dimension(plain.T, 4, 512, 'context length');
+  var C = dimension(plain.C, 8, 1024, 'embedding size');
+  var H = dimension(plain.H, 1, 32, 'attention heads');
+  var L = dimension(plain.L, 1, 16, 'layers');
+  if (C % H !== 0) throw new Error('Invalid checkpoint: n_embd must be divisible by n_heads.');
+  if (!isFinite(plain.dr) || plain.dr < 0 || plain.dr > 0.5) {
+    throw new Error('Invalid checkpoint dropout.');
+  }
+
+  var expectedValues = 2 * V * C + T * C + V + 2 * C + L * (12 * C * C + 10 * C);
+  if (expectedValues > 100000000) {
+    throw new Error('Checkpoint is too large to import safely in this browser.');
+  }
+  if (!Array.isArray(checkpoint.vocab) || checkpoint.vocab.length !== V ||
+      checkpoint.vocab.some(function (token) { return typeof token !== 'string'; })) {
+    throw new Error('Invalid checkpoint vocabulary.');
+  }
+  if (!Array.isArray(plain.blocks) || plain.blocks.length !== L) {
+    throw new Error('Invalid checkpoint blocks.');
+  }
+
+  numericArray(plain.wte, V * C, 'wte');
+  numericArray(plain.wpe, T * C, 'wpe');
+  numericArray(plain.lnFg, C, 'lnFg');
+  numericArray(plain.lnFb, C, 'lnFb');
+  numericArray(plain.head, C * V, 'head');
+  numericArray(plain.bhead, V, 'bhead');
+  for (var blockIndex = 0; blockIndex < L; blockIndex++) {
+    var block = plain.blocks[blockIndex];
+    if (!block || typeof block !== 'object') throw new Error('Invalid checkpoint block.');
+    var prefix = 'blocks[' + blockIndex + '].';
+    numericArray(block.ln1g, C, prefix + 'ln1g');
+    numericArray(block.ln1b, C, prefix + 'ln1b');
+    numericArray(block.Wq, C * C, prefix + 'Wq');
+    numericArray(block.Wk, C * C, prefix + 'Wk');
+    numericArray(block.Wv, C * C, prefix + 'Wv');
+    numericArray(block.Wo, C * C, prefix + 'Wo');
+    numericArray(block.bo, C, prefix + 'bo');
+    numericArray(block.ln2g, C, prefix + 'ln2g');
+    numericArray(block.ln2b, C, prefix + 'ln2b');
+    numericArray(block.Wf1, C * 4 * C, prefix + 'Wf1');
+    numericArray(block.bf1, 4 * C, prefix + 'bf1');
+    numericArray(block.Wf2, 4 * C * C, prefix + 'Wf2');
+    numericArray(block.bf2, C, prefix + 'bf2');
+  }
+}
+
 function plainToModel(plain) {
   var m = new MiniGPT(plain.V, plain.T, plain.C, plain.H, plain.L, plain.dr || 0.0);
   function set(target, arr) {
@@ -1234,19 +1328,24 @@ function plainToModel(plain) {
     target.assign(t);
     t.dispose();
   }
-  set(m.wte, plain.wte); set(m.wpe, plain.wpe);
-  set(m.lnFg, plain.lnFg); set(m.lnFb, plain.lnFb);
-  set(m.head, plain.head); set(m.bhead, plain.bhead);
-  for (var i = 0; i < m.blocks.length; i++) {
-    var src = plain.blocks[i], b = m.blocks[i];
-    set(b.ln1g, src.ln1g); set(b.ln1b, src.ln1b);
-    set(b.Wq, src.Wq); set(b.Wk, src.Wk); set(b.Wv, src.Wv);
-    set(b.Wo, src.Wo); set(b.bo, src.bo);
-    set(b.ln2g, src.ln2g); set(b.ln2b, src.ln2b);
-    set(b.Wf1, src.Wf1); set(b.bf1, src.bf1);
-    set(b.Wf2, src.Wf2); set(b.bf2, src.bf2);
+  try {
+    set(m.wte, plain.wte); set(m.wpe, plain.wpe);
+    set(m.lnFg, plain.lnFg); set(m.lnFb, plain.lnFb);
+    set(m.head, plain.head); set(m.bhead, plain.bhead);
+    for (var i = 0; i < m.blocks.length; i++) {
+      var src = plain.blocks[i], b = m.blocks[i];
+      set(b.ln1g, src.ln1g); set(b.ln1b, src.ln1b);
+      set(b.Wq, src.Wq); set(b.Wk, src.Wk); set(b.Wv, src.Wv);
+      set(b.Wo, src.Wo); set(b.bo, src.bo);
+      set(b.ln2g, src.ln2g); set(b.ln2b, src.ln2b);
+      set(b.Wf1, src.Wf1); set(b.bf1, src.bf1);
+      set(b.Wf2, src.Wf2); set(b.bf2, src.bf2);
+    }
+    return m;
+  } catch (err) {
+    m.dispose();
+    throw err;
   }
-  return m;
 }
 
 async function makeCheckpoint(state) {
@@ -1265,15 +1364,20 @@ async function makeCheckpoint(state) {
 }
 
 function restoreCheckpoint(checkpoint) {
-  if (checkpoint.schema && checkpoint.schema < 3) {
-    throw new Error('Old checkpoint format (schema ' + checkpoint.schema + ') is not supported by the GPU build.');
+  validateCheckpoint(checkpoint);
+  var vocab = checkpoint.vocab.slice();
+  var tokenToIdx = Object.create(null);
+  var idxToToken = Object.create(null);
+  for (var i = 0; i < vocab.length; i++) {
+    tokenToIdx[vocab[i]] = i;
+    idxToToken[i] = vocab[i];
   }
   return {
-    tokenizer: checkpoint.tokenizer || 'char',
-    config: checkpoint.config || {},
-    vocab: checkpoint.vocab || [],
-    tokenToIdx: checkpoint.tokenToIdx || {},
-    idxToToken: checkpoint.idxToToken || {},
+    tokenizer: checkpoint.tokenizer === 'word' ? 'word' : 'char',
+    config: checkpoint.config && typeof checkpoint.config === 'object' ? checkpoint.config : {},
+    vocab: vocab,
+    tokenToIdx: tokenToIdx,
+    idxToToken: idxToToken,
     model: plainToModel(checkpoint.model),
     stats: checkpoint.stats || {}
   };
@@ -1290,7 +1394,6 @@ var STATE = {
   tokenToIdx: {},
   idxToToken: {},
   indices: null,
-  text: '',
   model: null,
   optimizer: null,
   training: false,
@@ -1310,6 +1413,9 @@ function postMemoryUsage() {
 }
 
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+async function waitForTrainingToStop() {
+  while (STATE.training) await sleep(10);
+}
 
 // LR schedule: linear warmup, then cosine decay from lrStart to lrEnd
 function lrSchedule(step, totalSteps, warmup, lrStart, lrEnd) {
@@ -1324,7 +1430,10 @@ function lrSchedule(step, totalSteps, warmup, lrStart, lrEnd) {
 // TRAIN
 // =============================================================================
 async function trainAsync(payload) {
-  if (STATE.training) return;
+  if (STATE.training) {
+    postStatus('error', { message: 'Training is already running.', hasModel: !!STATE.model });
+    return;
+  }
   if (!STATE.backendInfo) {
     postStatus('error', { message: 'Backend not initialized.' });
     return;
@@ -1335,16 +1444,22 @@ async function trainAsync(payload) {
   var mode = cfg.tokenizer === 'word' ? 'word' : 'char';
   var vocabData = buildVocabulary(text, mode);
 
-  if (text.length < 8 || vocabData.vocab.length < 2) {
-    postStatus('error', { message: 'Training text is too small to build a model.' });
-    postStatus('done', { reason: 'invalid-data' });
+  if (vocabData.indices.length < 5 || vocabData.vocab.length < 2) {
+    postStatus('error', {
+      message: 'Training text needs at least 5 tokens and 2 distinct tokens.',
+      hasModel: !!STATE.model
+    });
     return;
   }
 
-  var blockSize = Math.max(4, Math.min(parseInt(cfg.blockSize, 10) || 24, 512));
-  var nEmbd     = Math.max(8, parseInt(cfg.nEmbd, 10) || 64);
-  var nHeads    = Math.max(1, parseInt(cfg.nHeads, 10) || 4);
-  var nLayers   = Math.max(1, parseInt(cfg.nLayers, 10) || 2);
+  var requestedBlockSize = clampInteger(cfg.blockSize, 24, 4, 512);
+  var blockSize = Math.min(requestedBlockSize, vocabData.indices.length - 1);
+  var nEmbd     = clampInteger(cfg.nEmbd, 64, 8, 1024);
+  var nHeads    = clampInteger(cfg.nHeads, 4, 1, 32);
+  var nLayers   = clampInteger(cfg.nLayers, 2, 1, 16);
+  if (blockSize !== requestedBlockSize) {
+    postStatus('log', { level: 'warn', message: 'Context length adjusted to ' + blockSize + ' to fit the training data.' });
+  }
 
   // Auto-correct heads to divide nEmbd
   if (nEmbd % nHeads !== 0) {
@@ -1352,23 +1467,25 @@ async function trainAsync(payload) {
     postStatus('log', { level: 'warn', message: 'n_heads adjusted to ' + nHeads + ' to divide n_embd.' });
   }
 
-  var steps      = Math.max(1, parseInt(cfg.epochs, 10) || 1000);
-  var batch      = Math.max(1, parseInt(cfg.batch, 10) || 8);
-  var lrStart    = Math.max(1e-6, parseFloat(cfg.lr) || 6e-4);
-  var lrEnd      = Math.max(1e-6, parseFloat(cfg.lrEnd) || lrStart);
-  var warmup     = Math.max(0, parseInt(cfg.warmup, 10) || 0);
-  var dropout    = Math.min(0.5, Math.max(0, parseFloat(cfg.dropout) || 0.1));
-  var wd         = Math.max(0, parseFloat(cfg.weightDecay) || 0);
-  var gradClip   = Math.max(0, parseFloat(cfg.gradClip) || 0);
-  var patience   = Math.max(1, parseInt(cfg.patience, 10) || 300);
-  var minDelta   = Math.max(0, parseFloat(cfg.minDelta) || 0.001);
+  var steps      = clampInteger(cfg.epochs, 1000, 1, 100000);
+  var batch      = clampInteger(cfg.batch, 8, 1, 256);
+  var lrStart    = Math.max(1e-6, finiteNumber(cfg.lr, 6e-4));
+  var lrEnd      = Math.max(1e-6, finiteNumber(cfg.lrEnd, lrStart));
+  var warmup     = clampInteger(cfg.warmup, 0, 0, Math.min(10000, steps));
+  var dropout    = clampNumber(cfg.dropout, 0.1, 0, 0.5);
+  var wd         = clampNumber(cfg.weightDecay, 0, 0, 1);
+  var gradClip   = clampNumber(cfg.gradClip, 0, 0, 100);
+  var patience   = clampInteger(cfg.patience, 300, 1, 10000);
+  var minDelta   = clampNumber(cfg.minDelta, 0.001, 0, 1);
   var autosaveEnabled = !!cfg.autosave;
-  var autosaveEvery   = Math.max(1, parseInt(cfg.autosaveEvery, 10) || 100);
-  var progressEvery   = Math.max(1, parseInt(cfg.progressEvery, 10) || 10);
+  var autosaveEvery   = clampInteger(cfg.autosaveEvery, 100, 1, 10000);
+  var progressEvery   = clampInteger(cfg.progressEvery, 10, 1, 1000);
 
   // Free old model/optim
   if (STATE.model) STATE.model.dispose();
   if (STATE.optimizer) STATE.optimizer.dispose();
+  STATE.model = null;
+  STATE.optimizer = null;
 
   var model = new MiniGPT(vocabData.vocab.length, blockSize, nEmbd, nHeads, nLayers, dropout);
   var optimizer = new AdamW(model.trainables(), lrStart, 0.9, 0.95, 1e-8, wd);
@@ -1378,13 +1495,12 @@ async function trainAsync(payload) {
     blockSize: blockSize, nEmbd: nEmbd, nHeads: nHeads, nLayers: nLayers,
     epochs: steps, batch: batch, lr: lrStart, lrEnd: lrEnd, warmup: warmup,
     dropout: dropout, weightDecay: wd, gradClip: gradClip,
-    patience: patience, minDelta: minDelta
+    patience: patience, minDelta: minDelta, tokenizer: mode
   };
   STATE.vocab      = vocabData.vocab;
   STATE.tokenToIdx = vocabData.tokenToIdx;
   STATE.idxToToken = vocabData.idxToToken;
   STATE.indices    = vocabData.indices;
-  STATE.text       = text;
   STATE.model      = model;
   STATE.optimizer  = optimizer;
   STATE.training   = true;
@@ -1400,13 +1516,13 @@ async function trainAsync(payload) {
   });
 
   var indices = vocabData.indices;
-  var validStarts = Math.max(1, indices.length - blockSize - 1);
+  var validStarts = Math.max(1, indices.length - blockSize);
 
   var smooth = Math.log(Math.max(2, vocabData.vocab.length));
   var best = Infinity;
   var badCount = 0;
   var totalSeen = 0;
-  var paramNames = model.trainables().map(function (v) { return v.name; });
+  var trainingFailure = null;
 
   for (var step = 1; step <= steps; step++) {
     if (STATE.stopRequested) break;
@@ -1428,23 +1544,29 @@ async function trainAsync(payload) {
     optimizer.lr = lr;
 
     var lossVal;
+    var grads = null;
     try {
-      var grads = tf.variableGrads(function () {
+      grads = tf.variableGrads(function () {
         return model.lossAndLogits(inputs, targets);
       }, model.trainables());
       lossVal = (await grads.value.data())[0];
-      grads.value.dispose();
       optimizer.step(grads.grads, gradClip);
-      // Free per-step grads
-      Object.keys(grads.grads).forEach(function (k) { grads.grads[k].dispose(); });
     } catch (err) {
-      inputs.dispose(); targets.dispose();
-      postStatus('error', { message: 'Training step failed: ' + (err.message || err) });
+      trainingFailure = 'Training step failed: ' + (err.message || err);
+    } finally {
+      if (grads) {
+        grads.value.dispose();
+        Object.keys(grads.grads).forEach(function (key) { grads.grads[key].dispose(); });
+      }
+      inputs.dispose();
+      targets.dispose();
+    }
+    if (trainingFailure) break;
+
+    if (!isFinite(lossVal)) {
+      trainingFailure = 'Training produced a non-finite loss.';
       break;
     }
-    inputs.dispose(); targets.dispose();
-
-    if (!isFinite(lossVal)) lossVal = smooth;
     smooth = smooth * 0.95 + lossVal * 0.05;
     totalSeen += batch * blockSize;
 
@@ -1474,8 +1596,12 @@ async function trainAsync(payload) {
     }
 
     if (autosaveEnabled && step % autosaveEvery === 0) {
-      var ckpt = await makeCheckpoint(STATE);
-      postStatus('autosave', { checkpoint: ckpt });
+      try {
+        var ckpt = await makeCheckpoint(STATE);
+        postStatus('autosave', { checkpoint: ckpt });
+      } catch (autosaveError) {
+        postStatus('log', { level: 'warn', message: 'Autosave snapshot failed: ' + (autosaveError.message || autosaveError) });
+      }
     }
 
     if (badCount >= patience) {
@@ -1487,15 +1613,28 @@ async function trainAsync(payload) {
     if (step % 4 === 0) await sleep(0);
   }
 
-  STATE.training = false;
-  var reason = STATE.stopRequested ? 'stopped' : 'finished';
-  var checkpoint = await makeCheckpoint(STATE);
+  var reason = STATE.stopRequested ? 'stopped' : (trainingFailure ? 'error' : (badCount >= patience ? 'early-stopped' : 'finished'));
+  var checkpoint = null;
+  if (trainingFailure) {
+    model.dispose();
+    optimizer.dispose();
+    STATE.model = null;
+    STATE.optimizer = null;
+    STATE.training = false;
+  } else {
+    try {
+      checkpoint = await makeCheckpoint(STATE);
+    } finally {
+      STATE.training = false;
+    }
+  }
   postStatus('done', {
     reason: reason,
     checkpoint: checkpoint,
     epoch: STATE.stats.epoch,
     bestLoss: STATE.stats.bestLoss,
-    loss: STATE.stats.smoothLoss
+    loss: STATE.stats.smoothLoss,
+    errorMessage: trainingFailure
   });
 }
 
@@ -1503,14 +1642,18 @@ async function trainAsync(payload) {
 // GENERATE
 // =============================================================================
 async function generateAsync(msg) {
+  if (STATE.training) {
+    postStatus('error', { id: msg.id, message: 'Stop training before generating.' });
+    return;
+  }
   if (!STATE.model) {
     postStatus('error', { id: msg.id, message: 'No model loaded.' });
     return;
   }
   var temp = typeof msg.temp === 'number' ? Math.max(0.05, msg.temp) : 1.0;
-  var topK = typeof msg.topK === 'number' ? msg.topK : 0;
-  var topP = typeof msg.topP === 'number' ? msg.topP : 1.0;
-  var maxNew = Math.max(1, parseInt(msg.length, 10) || 100);
+  var topK = clampInteger(msg.topK, 0, 0, STATE.model.V);
+  var topP = clampNumber(msg.topP, 1.0, 0.1, 1.0);
+  var maxNew = clampInteger(msg.length, 100, 1, 2000);
   var seedStr = msg.seed || '';
 
   var mode = STATE.tokenizer || 'char';
@@ -1526,20 +1669,23 @@ async function generateAsync(msg) {
 
   for (var n = 0; n < maxNew; n++) {
     var trimmed = ctx.length > Tmax ? ctx.slice(ctx.length - Tmax) : ctx.slice();
-    var pad = Tmax - trimmed.length;
-    var padded = new Int32Array(Tmax);
-    for (var p = 0; p < pad; p++) padded[p] = 0;
-    for (var q = 0; q < trimmed.length; q++) padded[pad + q] = trimmed[q];
+    var inputBuffer = Int32Array.from(trimmed);
 
-    var lastIdx = Tmax - 1;
-    var probsArr = await tf.tidy(function () {
-      var input = tf.tensor2d(padded, [1, Tmax], 'int32');
+    var inputLength = trimmed.length;
+    var lastIdx = inputLength - 1;
+    var probsTensor = tf.tidy(function () {
+      var input = tf.tensor2d(inputBuffer, [1, inputLength], 'int32');
       var logits = STATE.model.forward(input, false);   // [1, T, V]
       var lastLogits = logits.slice([0, lastIdx, 0], [1, 1, STATE.model.V]).reshape([STATE.model.V]);
       var scaled = lastLogits.div(temp);
-      var probs = tf.softmax(scaled);
-      return probs.array();
+      return tf.softmax(scaled);
     });
+    var probsArr;
+    try {
+      probsArr = Array.from(await probsTensor.data());
+    } finally {
+      probsTensor.dispose();
+    }
 
     var next = sampleFromDistribution(probsArr, topK, topP);
     ctx.push(next);
@@ -1574,12 +1720,14 @@ self.onmessage = async function (e) {
       return;
     }
     if (msg.type === 'export') {
+      if (STATE.training) { postStatus('error', { id: msg.id, message: 'Stop training before exporting.' }); return; }
       if (!STATE.model) { postStatus('error', { id: msg.id, message: 'Nothing to export.' }); return; }
       var c = await makeCheckpoint(STATE);
       postStatus('exported', { id: msg.id, checkpoint: c });
       return;
     }
     if (msg.type === 'import') {
+      if (STATE.training) { postStatus('error', { id: msg.id, message: 'Stop training before importing.' }); return; }
       var restored = restoreCheckpoint(msg.checkpoint);
       if (STATE.model) STATE.model.dispose();
       if (STATE.optimizer) { STATE.optimizer.dispose(); STATE.optimizer = null; }
@@ -1589,27 +1737,40 @@ self.onmessage = async function (e) {
       STATE.tokenToIdx = restored.tokenToIdx;
       STATE.idxToToken = restored.idxToToken;
       STATE.model = restored.model;
-      postStatus('imported', { id: msg.id, vocabSize: STATE.vocab.length, params: STATE.model.countParams() });
+      postStatus('imported', {
+        id: msg.id,
+        vocabSize: STATE.vocab.length,
+        params: STATE.model.countParams(),
+        tokenizer: STATE.tokenizer
+      });
       return;
     }
     if (msg.type === 'reset') {
+      if (STATE.training) {
+        STATE.stopRequested = true;
+        await waitForTrainingToStop();
+      }
       if (STATE.model) STATE.model.dispose();
       if (STATE.optimizer) STATE.optimizer.dispose();
       STATE.model = null;
       STATE.optimizer = null;
       STATE.indices = null;
-      STATE.text = '';
       STATE.vocab = [];
       STATE.tokenToIdx = {};
       STATE.idxToToken = {};
       STATE.training = false;
       STATE.stopRequested = false;
       STATE.stats = { epoch: 0, bestLoss: Infinity, smoothLoss: Infinity, lossHistory: [], start: 0 };
-      postStatus('reset', { memory: postMemoryUsage() });
+      postStatus('reset', { id: msg.id, memory: postMemoryUsage() });
       return;
     }
+    postStatus('error', { id: msg.id, message: 'Unknown worker message type.' });
   } catch (err) {
-    postStatus('error', { id: msg.id, message: (err && err.message) ? err.message : String(err) });
+    postStatus('error', {
+      id: msg.id,
+      message: (err && err.message) ? err.message : String(err),
+      hasModel: !!STATE.model
+    });
   }
 };
 `;
@@ -1629,28 +1790,34 @@ self.onmessage = async function (e) {
       'tokenizer','topK','topP','genLen','tempR','tempV','seed','patience','minDelta',
       'autosave','autosaveEvery','sVocab','sParams','sEpoch','sLoss','sBest','sSpeed',
       'sTime','sMem','sBackend','sDevice','sRisk','sRecommend','sTokenCount','pbar','cvs',
-      'output','log','statusPill','datasetInfo','sectionSafety'
+      'output','log','statusPill','datasetInfo','trainingProgress'
     ];
     const els = {};
     ids.forEach(id => els[id] = document.getElementById(id));
 
     let worker = null;
-    let workerRestartAttempts = 0;
-    const WORKER_RESTART_LIMIT = 3;
     let busy = false;
+    let resetInProgress = false;
     let backendInfo = null;
     let hasModel = false; // true once a model exists in the worker (trained, imported, or restored)
     let currentRequestId = 0;
     const pending = new Map();
     let lossHist = [];
     let settingsTimer = null;
+    let resizeFrame = null;
     let autosaveDB = null;
-    let lastCheckpoint = null;
 
     // ----- Utils -----
     function safeNumber(value, fallback) {
       const n = Number(value);
       return Number.isFinite(n) ? n : fallback;
+    }
+    function readNumberInput(id, fallback, integer = false) {
+      const input = els[id];
+      let value = safeNumber(input.value, fallback);
+      if (input.min !== '') value = Math.max(Number(input.min), value);
+      if (input.max !== '') value = Math.min(Number(input.max), value);
+      return integer ? Math.round(value) : value;
     }
     function fmtNum(n) {
       if (!Number.isFinite(n)) return '--';
@@ -1753,25 +1920,25 @@ self.onmessage = async function (e) {
     // ----- Config <-> UI -----
     function readConfig() {
       return {
-        blockSize: parseInt(els.blockSize.value, 10) || 24,
-        nEmbd: parseInt(els.nEmbd.value, 10) || 64,
-        nHeads: parseInt(els.nHeads.value, 10) || 4,
-        nLayers: parseInt(els.nLayers.value, 10) || 2,
-        epochs: parseInt(els.epochs.value, 10) || 1000,
-        batch: parseInt(els.batch.value, 10) || 8,
-        lr: parseFloat(els.lr.value) || 0.0006,
-        lrEnd: parseFloat(els.lrEnd.value) || 0.0001,
-        warmup: parseInt(els.warmup.value, 10) || 0,
-        weightDecay: parseFloat(els.weightDecay.value) || 0,
-        gradClip: parseFloat(els.gradClip.value) || 0,
-        dropout: parseFloat(els.dropout.value) || 0.1,
+        blockSize: readNumberInput('blockSize', 24, true),
+        nEmbd: readNumberInput('nEmbd', 64, true),
+        nHeads: readNumberInput('nHeads', 4, true),
+        nLayers: readNumberInput('nLayers', 2, true),
+        epochs: readNumberInput('epochs', 1000, true),
+        batch: readNumberInput('batch', 8, true),
+        lr: readNumberInput('lr', 0.0006),
+        lrEnd: readNumberInput('lrEnd', 0.0001),
+        warmup: readNumberInput('warmup', 0, true),
+        weightDecay: readNumberInput('weightDecay', 0),
+        gradClip: readNumberInput('gradClip', 0),
+        dropout: readNumberInput('dropout', 0.1),
         tokenizer: els.tokenizer.value,
-        topK: parseInt(els.topK.value, 10) || 0,
-        topP: Math.min(1, Math.max(0.1, parseFloat(els.topP.value) || 0.95)),
-        patience: parseInt(els.patience.value, 10) || 400,
-        minDelta: parseFloat(els.minDelta.value) || 0.001,
+        topK: readNumberInput('topK', 0, true),
+        topP: readNumberInput('topP', 0.95),
+        patience: readNumberInput('patience', 400, true),
+        minDelta: readNumberInput('minDelta', 0.001),
         autosave: !!els.autosave.checked,
-        autosaveEvery: parseInt(els.autosaveEvery.value, 10) || 100,
+        autosaveEvery: readNumberInput('autosaveEvery', 100, true),
         progressEvery: 10
       };
     }
@@ -1787,6 +1954,7 @@ self.onmessage = async function (e) {
       if (cfg.temp != null) {
         els.tempR.value = cfg.temp;
         els.tempV.textContent = Number(cfg.temp).toFixed(1);
+        syncRangeFill(els.tempR);
       }
       updateSafetyUI();
       saveSettingsDebounced();
@@ -1918,7 +2086,7 @@ self.onmessage = async function (e) {
             const fn = new Function('self', clean);
             fn(fakeSelf);
           } catch (e) {
-            if (worker.onerror) worker.onerror(e);
+            if (this.onerror) this.onerror(e);
             console.error('FakeWorker init error:', e);
           }
         }, 0);
@@ -1938,14 +2106,38 @@ self.onmessage = async function (e) {
 
     // ===== iOS Tab bar =====
     function initTabs() {
-      document.querySelectorAll('.tab-item').forEach(btn => {
+      const tabs = Array.from(document.querySelectorAll('.tab-item'));
+      const panels = Array.from(document.querySelectorAll('.panel'));
+      function activateTab(btn, moveFocus = false) {
+        const target = btn.dataset.panel;
+        tabs.forEach(tab => {
+          const selected = tab === btn;
+          tab.classList.toggle('active', selected);
+          tab.setAttribute('aria-selected', String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+        });
+        panels.forEach(panel => {
+          const selected = panel.id === target;
+          panel.classList.toggle('active', selected);
+          panel.hidden = !selected;
+        });
+        if (moveFocus) btn.focus();
+      }
+      tabs.forEach(btn => {
         btn.addEventListener('click', () => {
-          const target = btn.dataset.panel;
-          document.querySelectorAll('.tab-item').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
-          document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-          btn.classList.add('active');
-          btn.setAttribute('aria-selected','true');
-          document.getElementById(target).classList.add('active');
+          activateTab(btn);
+          haptic('light');
+        });
+        btn.addEventListener('keydown', event => {
+          const current = tabs.indexOf(btn);
+          let next = current;
+          if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (current + 1) % tabs.length;
+          else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (current - 1 + tabs.length) % tabs.length;
+          else if (event.key === 'Home') next = 0;
+          else if (event.key === 'End') next = tabs.length - 1;
+          else return;
+          event.preventDefault();
+          activateTab(tabs[next], true);
           haptic('light');
         });
       });
@@ -1978,60 +2170,87 @@ self.onmessage = async function (e) {
         return fake;
       }
     }
+    function invalidateWorker(failedWorker, error) {
+      // An error from an older worker must not tear down a replacement that
+      // has already been installed.
+      if (worker !== failedWorker) return;
+
+      worker = null;
+      try {
+        failedWorker.onerror = null;
+        failedWorker.onmessage = null;
+        failedWorker.terminate();
+      } catch (_) {}
+
+      busy = false;
+      backendInfo = null;
+      hasModel = false;
+      els.btnTrain.disabled = true;
+      els.btnStop.disabled = true;
+      refreshActionButtons();
+
+      const reason = error instanceof Error
+        ? error
+        : new Error((error && error.message) || 'Worker error');
+      for (const request of pending.values()) {
+        if (request.timer) clearTimeout(request.timer);
+        request.reject(reason);
+      }
+      pending.clear();
+
+      setStatus('Worker error', 'danger');
+      appendLog(reason.message, 'error');
+      console.error(error || reason);
+    }
     function ensureWorker() {
       if (worker) return worker;
-      worker = createWorker(WORKER_SOURCE);
+      const newWorker = createWorker(WORKER_SOURCE);
+      worker = newWorker;
       // Attach handlers before sending anything, so no message/error can
       // arrive before we're listening for it.
-      worker.onerror = (err) => {
-        // The worker is gone: reusing this same (dead) instance forever
-        // would silently break every future action. Let the next call to
-        // ensureWorker() spin up a fresh one instead.
-        worker = null;
-        busy = false;
-        backendInfo = null;
-        // Whatever model existed only in the crashed worker's memory is
-        // gone with it — reflect that immediately instead of leaving
-        // Generate/Export looking available when they'd just fail.
-        hasModel = false;
-        refreshActionButtons();
-        els.btnTrain.disabled = true;
-        // Fail any in-flight request now rather than making it wait out
-        // the 180s timeout in requestWorker().
-        pending.forEach((req) => req.reject(new Error('Worker crashed.')));
-        pending.clear();
-        setStatus('Worker error', 'danger');
-        appendLog((err && err.message) || 'Worker error', 'error');
-        if (workerRestartAttempts < WORKER_RESTART_LIMIT) {
-          workerRestartAttempts++;
-          appendLog(`Restarting GPU worker (attempt ${workerRestartAttempts}/${WORKER_RESTART_LIMIT})…`, 'warn');
-          ensureWorker();
-        } else {
-          appendLog('GPU worker keeps failing. Reload the page to try again. If you enabled autosave, your last checkpoint is still there after reload.', 'error');
-        }
-        console.error(err);
+      newWorker.onerror = (err) => {
+        if (err && typeof err.preventDefault === 'function') err.preventDefault();
+        invalidateWorker(newWorker, err);
       };
-      worker.onmessage = onWorkerMessage;
-      worker.postMessage({ type: 'init' });
+      newWorker.onmessage = onWorkerMessage;
+      try {
+        newWorker.postMessage({ type: 'init' });
+      } catch (err) {
+        invalidateWorker(newWorker, err);
+        throw err;
+      }
       setStatus('Init GPU…', 'warn');
-      appendLog(worker.__isRealWorker
+      appendLog(newWorker.__isRealWorker
         ? 'Training will run off the main thread (Web Worker).'
         : 'Web Workers unavailable in this environment — training will run on the main thread.', 'info');
-      return worker;
+      return newWorker;
     }
     function postToWorker(msg) {
-      ensureWorker();
-      worker.postMessage(msg);
+      const activeWorker = ensureWorker();
+      try {
+        activeWorker.postMessage(msg);
+        return activeWorker;
+      } catch (err) {
+        invalidateWorker(activeWorker, err);
+        throw err;
+      }
     }
     function requestWorker(type, payload = {}) {
       return new Promise((resolve, reject) => {
         const id = ++currentRequestId;
-        pending.set(id, { resolve, reject });
-        postToWorker(Object.assign({ type, id }, payload));
-        setTimeout(() => {
+        const request = { resolve, reject, timer: null, worker: null };
+        pending.set(id, request);
+        try {
+          request.worker = postToWorker(Object.assign({ type, id }, payload));
+        } catch (err) {
+          // invalidateWorker normally settles this request. This also covers
+          // failures that happen before a worker instance can be installed.
+          if (pending.delete(id)) reject(err);
+          return;
+        }
+        request.timer = setTimeout(() => {
           if (pending.has(id)) {
-            pending.delete(id);
-            reject(new Error('Worker request timed out.'));
+            invalidateWorker(request.worker, new Error('Worker request timed out.'));
           }
         }, 180000);
       });
@@ -2151,7 +2370,9 @@ self.onmessage = async function (e) {
         els.sMem.textContent = fmtBytes(payload.memory.numBytes) + ' · ' + payload.memory.numTensors + ' t';
       }
       const progress = payload.epochs ? (payload.epoch / payload.epochs) * 100 : 0;
-      els.pbar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+      const boundedProgress = Math.max(0, Math.min(100, progress));
+      els.pbar.style.width = `${boundedProgress}%`;
+      els.trainingProgress.setAttribute('aria-valuenow', String(Math.round(boundedProgress)));
     }
 
     function getSeedFallback() {
@@ -2170,9 +2391,14 @@ self.onmessage = async function (e) {
     // assignments that could leave Generate/Export in the wrong state after
     // an error (see audit item I1).
     function refreshActionButtons() {
+      els.btnTrain.disabled = busy || !backendInfo;
       els.btnGen.disabled = busy || !hasModel;
-      els.btnExportModel.disabled = !hasModel;
-      els.btnClearModel.disabled = !hasModel;
+      els.btnExportModel.disabled = busy || !hasModel;
+      els.btnImportModel.disabled = busy;
+      els.btnLoadAutosave.disabled = busy;
+      els.btnClearAutosave.disabled = busy;
+      els.btnClearModel.disabled = busy || !hasModel;
+      els.btnReset.disabled = busy && els.btnStop.disabled;
     }
 
     // ----- Actions -----
@@ -2201,7 +2427,6 @@ self.onmessage = async function (e) {
       busy = true;
       lossHist = [];
       drawLossGraph(lossHist);
-      els.btnTrain.disabled = true;
       els.btnStop.disabled = false;
       refreshActionButtons();
       setStatus('Training on ' + (backendInfo.backend || 'gpu').toUpperCase(), 'warn');
@@ -2210,11 +2435,22 @@ self.onmessage = async function (e) {
       const stats = countTextStats(text);
       els.datasetInfo.textContent = `${stats.chars} chars · ${stats.words} words · ${cfg.tokenizer}`;
 
-      postToWorker({ type: 'train', text, config: cfg });
+      try {
+        postToWorker({ type: 'train', text, config: cfg });
+      } catch (err) {
+        busy = false;
+        els.btnStop.disabled = true;
+        refreshActionButtons();
+        appendLog(`Training failed to start: ${err.message}`, 'error');
+      }
     }
 
     function stopTraining() {
+      if (!busy || els.btnStop.disabled) return;
       postToWorker({ type: 'stop' });
+      els.btnStop.disabled = true;
+      refreshActionButtons();
+      setStatus('Stopping…', 'warn');
       appendLog('Stop requested.', 'warn');
     }
 
@@ -2231,30 +2467,48 @@ self.onmessage = async function (e) {
       els.sParams.textContent = '--';
       els.sVocab.textContent = '--';
       els.pbar.style.width = '0%';
+      els.trainingProgress.setAttribute('aria-valuenow', '0');
       setStatus(backendInfo ? 'Ready' : 'Init GPU…', backendInfo ? 'safe' : 'warn');
     }
 
-    function resetAll() {
-      stopTraining();
-      busy = false;
-      postToWorker({ type: 'reset' });
-      resetUIOnly();
-      appendLog('Model reset.', 'warn');
-      els.btnTrain.disabled = !backendInfo;
+    async function resetAll() {
+      if (busy && els.btnStop.disabled) {
+        appendLog('Wait for the current operation to finish.', 'warn');
+        return;
+      }
+      if (busy) stopTraining();
+      resetInProgress = true;
+      busy = true;
       els.btnStop.disabled = true;
-      hasModel = false;
       refreshActionButtons();
+      setStatus('Resetting…', 'warn');
+      try {
+        await requestWorker('reset', {});
+        resetUIOnly();
+        hasModel = false;
+        appendLog('Model reset.', 'warn');
+      } catch (err) {
+        appendLog(`Reset failed: ${err.message}`, 'error');
+        setStatus('Error', 'danger');
+      } finally {
+        resetInProgress = false;
+        busy = false;
+        els.btnStop.disabled = true;
+        refreshActionButtons();
+      }
     }
 
     async function generateText() {
       if (!backendInfo) { appendLog('GPU backend not ready.', 'warn'); return; }
       const seed = els.seed.value.trim() || getSeedFallback();
       const cfg = readConfig();
-      const len = Math.max(1, parseInt(els.genLen.value, 10) || 150);
+      const len = readNumberInput('genLen', 150, true);
       if (busy) {
         appendLog('Wait until training ends or stop it first.', 'warn');
         return;
       }
+      busy = true;
+      refreshActionButtons();
       setStatus('Generating', 'warn');
       try {
         const result = await requestWorker('generate', {
@@ -2270,15 +2524,21 @@ self.onmessage = async function (e) {
       } catch (err) {
         appendLog(`Generation failed: ${err.message}`, 'error');
         setStatus('Error', 'danger');
+      } finally {
+        busy = false;
+        refreshActionButtons();
       }
     }
 
     async function exportModel() {
+      if (busy) return;
+      busy = true;
+      refreshActionButtons();
+      setStatus('Exporting…', 'warn');
       try {
         const payload = await requestWorker('export', {});
         const checkpoint = payload.checkpoint;
         if (!checkpoint) throw new Error('No checkpoint returned.');
-        lastCheckpoint = checkpoint;
         const blob = new Blob([JSON.stringify(checkpoint)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2290,55 +2550,100 @@ self.onmessage = async function (e) {
         URL.revokeObjectURL(url);
         appendLog('Model exported.', 'ok');
         if (els.autosave.checked) await saveAutosave(checkpoint);
+        setStatus('Ready', 'safe');
       } catch (err) {
         appendLog(`Export failed: ${err.message}`, 'error');
+        setStatus('Error', 'danger');
+      } finally {
+        busy = false;
+        refreshActionButtons();
       }
     }
 
     async function importModelFromFile(file) {
-      const text = await file.text();
-      const checkpoint = JSON.parse(text);
-      if (checkpoint.schema && checkpoint.schema < 3) {
-        appendLog('Old checkpoint format (schema < 3) is not supported by the GPU build.', 'error');
-        return;
+      if (busy) return;
+      if (file.size > 512 * 1024 * 1024) {
+        throw new Error('Checkpoint file is too large to import safely.');
       }
-      const payload = await requestWorker('import', { checkpoint });
-      lastCheckpoint = checkpoint;
-      if (checkpoint.config) setConfig(checkpoint.config);
-      if (payload.vocabSize != null) els.sVocab.textContent = String(payload.vocabSize);
-      if (payload.params != null) els.sParams.textContent = fmtNum(payload.params);
-      hasModel = true;
+      busy = true;
       refreshActionButtons();
-      appendLog('Model imported.', 'ok');
-      setStatus('Ready', 'safe');
+      setStatus('Importing…', 'warn');
+      try {
+        const text = await file.text();
+        const checkpoint = JSON.parse(text);
+        if (!checkpoint || checkpoint.schema !== 3) {
+          throw new Error('Unsupported checkpoint schema. Only schema 3 is supported.');
+        }
+        const payload = await requestWorker('import', { checkpoint });
+        setConfig(Object.assign({}, checkpoint.config || {}, {
+          tokenizer: checkpoint.tokenizer || payload.tokenizer || 'char'
+        }));
+        if (payload.vocabSize != null) els.sVocab.textContent = String(payload.vocabSize);
+        if (payload.params != null) els.sParams.textContent = fmtNum(payload.params);
+        hasModel = true;
+        appendLog('Model imported.', 'ok');
+        setStatus('Ready', 'safe');
+      } finally {
+        busy = false;
+        refreshActionButtons();
+      }
     }
 
     async function restoreAutosaveToWorker() {
-      const checkpoint = await loadAutosave();
-      if (!checkpoint) { appendLog('No autosave found.', 'warn'); return; }
-      if (checkpoint.schema && checkpoint.schema < 3) {
-        appendLog('Autosave is from old format (schema < 3) — clearing it.', 'warn');
-        await clearAutosave();
-        return;
-      }
-      const payload = await requestWorker('import', { checkpoint });
-      lastCheckpoint = checkpoint;
-      if (checkpoint.config) setConfig(checkpoint.config);
-      if (payload.vocabSize != null) els.sVocab.textContent = String(payload.vocabSize);
-      if (payload.params != null) els.sParams.textContent = fmtNum(payload.params);
-      hasModel = true;
+      if (busy) return;
+      busy = true;
       refreshActionButtons();
-      appendLog('Autosave restored.', 'ok');
+      setStatus('Restoring…', 'warn');
+      try {
+        const checkpoint = await loadAutosave();
+        if (!checkpoint) {
+          appendLog('No autosave found.', 'warn');
+          setStatus('Ready', 'safe');
+          return;
+        }
+        if (checkpoint.schema !== 3) {
+          appendLog('Autosave has an unsupported schema — clearing it.', 'warn');
+          await clearAutosave();
+          setStatus('Ready', 'safe');
+          return;
+        }
+        const payload = await requestWorker('import', { checkpoint });
+        setConfig(Object.assign({}, checkpoint.config || {}, {
+          tokenizer: checkpoint.tokenizer || payload.tokenizer || 'char'
+        }));
+        if (payload.vocabSize != null) els.sVocab.textContent = String(payload.vocabSize);
+        if (payload.params != null) els.sParams.textContent = fmtNum(payload.params);
+        hasModel = true;
+        appendLog('Autosave restored.', 'ok');
+        setStatus('Ready', 'safe');
+      } catch (err) {
+        appendLog(`Autosave restore failed: ${err.message}`, 'error');
+        setStatus('Error', 'danger');
+      } finally {
+        busy = false;
+        refreshActionButtons();
+      }
     }
 
     async function clearModel() {
-      busy = false;
-      lastCheckpoint = null;
-      try { await requestWorker('reset', {}); } catch (_) { postToWorker({ type: 'reset' }); }
-      resetUIOnly();
-      hasModel = false;
+      if (busy) return;
+      resetInProgress = true;
+      busy = true;
       refreshActionButtons();
-      appendLog('Model cleared.', 'warn');
+      setStatus('Clearing…', 'warn');
+      try {
+        await requestWorker('reset', {});
+        resetUIOnly();
+        hasModel = false;
+        appendLog('Model cleared.', 'warn');
+      } catch (err) {
+        appendLog(`Clear model failed: ${err.message}`, 'error');
+        setStatus('Error', 'danger');
+      } finally {
+        resetInProgress = false;
+        busy = false;
+        refreshActionButtons();
+      }
     }
 
     // ----- Worker incoming -----
@@ -2347,7 +2652,6 @@ self.onmessage = async function (e) {
       if (msg.type === 'ready') {
         backendInfo = msg.backend || null;
         if (backendInfo) {
-          workerRestartAttempts = 0;
           els.sBackend.textContent = (backendInfo.backend || 'gpu').toUpperCase();
           els.sBackend.dataset.kind = backendInfo.backend === 'webgpu' ? 'safe' : 'warn';
           if (backendInfo.adapter) {
@@ -2358,7 +2662,7 @@ self.onmessage = async function (e) {
           appendLog(`GPU backend ready: ${backendInfo.backend}` +
                     (backendInfo.adapter ? ` (${backendInfo.adapter})` : ''), 'ok');
           setStatus('Ready', 'safe');
-          els.btnTrain.disabled = false;
+          refreshActionButtons();
         }
         if (msg.memory) {
           els.sMem.textContent = fmtBytes(msg.memory.numBytes) + ' · ' + msg.memory.numTensors + ' t';
@@ -2367,6 +2671,8 @@ self.onmessage = async function (e) {
       }
       if (msg.type === 'start') {
         busy = true;
+        hasModel = true;
+        if (msg.config) setConfig(msg.config);
         if (msg.vocabSize != null) els.sVocab.textContent = String(msg.vocabSize);
         if (msg.params != null) els.sParams.textContent = fmtNum(msg.params);
         if (msg.backend) {
@@ -2374,6 +2680,7 @@ self.onmessage = async function (e) {
           els.sBackend.textContent = (backendInfo.backend || 'gpu').toUpperCase();
         }
         setStatus('Training on ' + ((backendInfo && backendInfo.backend) || 'gpu').toUpperCase(), 'warn');
+        refreshActionButtons();
         return;
       }
       if (msg.type === 'progress') {
@@ -2381,31 +2688,35 @@ self.onmessage = async function (e) {
         return;
       }
       if (msg.type === 'autosave') {
-        lastCheckpoint = msg.checkpoint || lastCheckpoint;
         if (msg.checkpoint && els.autosave.checked) saveAutosave(msg.checkpoint);
         return;
       }
       if (msg.type === 'done') {
+        if (resetInProgress) return;
         busy = false;
-        els.btnTrain.disabled = !backendInfo;
         els.btnStop.disabled = true;
         hasModel = !!msg.checkpoint;
         refreshActionButtons();
         if (msg.checkpoint) {
-          lastCheckpoint = msg.checkpoint;
           if (els.autosave.checked) saveAutosave(msg.checkpoint);
         }
         if (Number.isFinite(msg.epoch)) els.sEpoch.textContent = String(msg.epoch);
         if (Number.isFinite(msg.bestLoss)) els.sBest.textContent = msg.bestLoss.toFixed(4);
         if (Number.isFinite(msg.loss)) els.sLoss.textContent = msg.loss.toFixed(4);
-        setStatus(msg.reason === 'stopped' ? 'Stopped' : 'Ready', msg.reason === 'stopped' ? 'neutral' : 'safe');
-        appendLog(`Training ${msg.reason}.`, msg.reason === 'stopped' ? 'warn' : 'ok');
+        if (msg.reason === 'error') {
+          setStatus('Error', 'danger');
+          appendLog(msg.errorMessage || 'Training failed.', 'error');
+        } else {
+          setStatus(msg.reason === 'stopped' ? 'Stopped' : 'Ready', msg.reason === 'stopped' ? 'neutral' : 'safe');
+          appendLog(`Training ${msg.reason}.`, msg.reason === 'stopped' ? 'warn' : 'ok');
+        }
         return;
       }
       if (msg.type === 'generated' || msg.type === 'exported' || msg.type === 'imported' || msg.type === 'reset') {
         const req = pending.get(msg.id);
         if (req) {
           pending.delete(msg.id);
+          if (req.timer) clearTimeout(req.timer);
           req.resolve(msg);
         }
         if (msg.type === 'imported') {
@@ -2414,7 +2725,11 @@ self.onmessage = async function (e) {
           hasModel = true;
           refreshActionButtons();
         }
-        if (msg.type === 'reset') setStatus('Ready', 'safe');
+        if (msg.type === 'reset') {
+          hasModel = false;
+          refreshActionButtons();
+          setStatus(backendInfo ? 'Ready' : 'Init GPU…', backendInfo ? 'safe' : 'warn');
+        }
         return;
       }
       if (msg.type === 'log') {
@@ -2425,18 +2740,13 @@ self.onmessage = async function (e) {
         const req = pending.get(msg.id);
         if (req) {
           pending.delete(msg.id);
-          if (msg.message === 'No model loaded.') {
-            // The worker just told us, authoritatively, that there is no
-            // model in memory — trust it over whatever the UI thought.
-            hasModel = false;
-            refreshActionButtons();
-          }
+          if (req.timer) clearTimeout(req.timer);
           req.reject(new Error(msg.message || 'Worker error'));
           return;
         }
         busy = false;
-        els.btnTrain.disabled = !backendInfo;
         els.btnStop.disabled = true;
+        if (typeof msg.hasModel === 'boolean') hasModel = msg.hasModel;
         refreshActionButtons();
         setStatus('Error', 'danger');
         appendLog(msg.message || 'Worker error', 'error');
@@ -2452,6 +2762,7 @@ self.onmessage = async function (e) {
         if (!file) return;
         if (!/\.txt$/i.test(file.name) && file.type !== 'text/plain') {
           appendLog('Only .txt files are supported.', 'warn');
+          input.value = '';
           return;
         }
         const reader = new FileReader();
@@ -2463,6 +2774,11 @@ self.onmessage = async function (e) {
           saveSettingsDebounced();
           saveTrainingTextDebounced();
           appendLog(`Loaded ${file.name}.`, 'ok');
+          input.value = '';
+        };
+        reader.onerror = () => {
+          appendLog(`Could not read ${file.name}.`, 'error');
+          input.value = '';
         };
         reader.readAsText(file);
       }
@@ -2542,7 +2858,10 @@ self.onmessage = async function (e) {
         const file = els.modelFile.files && els.modelFile.files[0];
         if (!file) return;
         try { await importModelFromFile(file); }
-        catch (err) { appendLog(`Import failed: ${err.message}`, 'error'); }
+        catch (err) {
+          appendLog(`Import failed: ${err.message}`, 'error');
+          setStatus('Error', 'danger');
+        }
         finally { els.modelFile.value = ''; }
       });
 
@@ -2566,7 +2885,13 @@ self.onmessage = async function (e) {
         });
       });
 
-      window.addEventListener('resize', () => drawLossGraph(lossHist));
+      window.addEventListener('resize', () => {
+        if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = null;
+          drawLossGraph(lossHist);
+        });
+      });
     }
 
 
@@ -2603,13 +2928,17 @@ self.onmessage = async function (e) {
       loadSettings();
       updateSafetyUI();
       drawLossGraph(lossHist);
-      els.seed.value = '';
       els.btnStop.disabled = true;
       els.btnTrain.disabled = true;
       refreshActionButtons();
       setStatus('Init GPU…', 'warn');
       appendLog('Booting GPU worker (TensorFlow.js + WebGPU)…', 'info');
       ensureWorker();
+      if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+        navigator.serviceWorker.register('./service-worker.js').catch(err => {
+          appendLog(`Offline cache unavailable: ${err.message}`, 'warn');
+        });
+      }
       try {
         await openAutosaveDB();
         const savedText = await loadTrainingText();

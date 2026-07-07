@@ -1,12 +1,9 @@
 /**
  * gpt.js — Service Worker
- * Strategy: Cache-first for assets, network-first for HTML
+ * Strategy: network-first for documents, stale-while-revalidate for local assets.
  */
 
-// v2: 'apple-touch-icon.png' was listed here but never existed in the repo.
-// cache.addAll() rejects the *entire* install if a single asset 404s, so the
-// service worker never precached anything and offline mode never worked.
-const CACHE_NAME = 'gptjs-v2';
+const CACHE_NAME = 'gptjs-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -47,38 +44,32 @@ self.addEventListener('activate', event => {
 
 // ── FETCH: cache-first for all same-origin requests ───────────────────────
 self.addEventListener('fetch', event => {
-  // Only handle GET requests from same origin
-  if (event.request.method !== 'GET') return;
+  const request = event.request;
+  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) {
-        // Serve from cache, refresh in background (stale-while-revalidate)
-        const networkFetch = fetch(event.request).then(response => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          }
-          return response;
-        }).catch(() => {}); // silently fail network refresh
-
-        return cached;
-      }
-
-      // Not in cache — fetch from network and cache it
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put('./index.html', response.clone());
         }
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         return response;
-      }).catch(() => {
-        // Offline fallback: if HTML requested, return cached index
-        if (event.request.destination === 'document') {
-          return caches.match('./index.html');
-        }
-      });
-    })
-  );
+      } catch (_) {
+        return caches.match('./index.html');
+      }
+    })());
+    return;
+  }
+
+  const update = fetch(request).then(async response => {
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+    }
+    return response;
+  });
+  event.waitUntil(update.catch(() => {}));
+  event.respondWith(caches.match(request).then(cached => cached || update));
 });
