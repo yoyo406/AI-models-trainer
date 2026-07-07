@@ -10,7 +10,7 @@ No backend. No server. Just your browser, your GPU, and questionable life choice
 
 - ⚡ **GPU-only training** (WebGPU → fallback WebGL)
 - 🧠 **Mini GPT architecture** (decoder transformer)
-- 🧵 **Web Worker training** (non-blocking UI)
+- 🧵 **Off-main-thread training** via a real Web Worker (falls back to same-thread execution if Workers are unavailable)
 - 💾 **Autosave with IndexedDB**
 - 📦 **Checkpoint export/import (JSON)**
 - 🔤 **Char-level & word-level tokenization**
@@ -61,7 +61,7 @@ Adjust parameters like:
 ### 3. Train
 Click **"Train on GPU"**
 
-Training runs inside a Web Worker.
+Training runs off the main thread via a real Web Worker when the browser allows it (falls back to same-thread execution otherwise).
 
 ### 4. Generate
 - Enter a seed
