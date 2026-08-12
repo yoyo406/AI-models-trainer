@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -13,7 +14,8 @@ function loadWorkerHelpers(tf = {}) {
   const workerSource = new Function(`${workerMatch[0]}\nreturn WORKER_SOURCE;`)();
   return new Function('self', 'tf', `${workerSource}; return {
     clampNumber, clampInteger, tokenizeText, buildVocabulary, validateCheckpoint,
-    isWebGPUImplementationError, MiniGPT
+    isWebGPUImplementationError, normalizeTemperature, createSeededRandom,
+    normalizeStats, MiniGPT
   };`)(self, tf);
 }
 
@@ -83,6 +85,8 @@ test('worker parsing preserves valid zero values and tokenizes consistently', ()
   assert.equal(helpers.clampNumber(0, 0.1, 0, 0.5), 0);
   assert.equal(helpers.clampInteger(999, 10, 1, 100), 100);
   assert.deepEqual(helpers.tokenizeText('a  b', 'word'), ['a', '  ', 'b']);
+  assert.deepEqual(helpers.tokenizeText('😀', 'char'), ['😀']);
+  assert.ok(helpers.buildVocabulary('ab', 'char').vocab.includes('<UNK>'));
   assert.equal(helpers.buildVocabulary('ababa', 'char').indices.length, 5);
 });
 
@@ -131,4 +135,70 @@ test('WebGPU mapped-buffer failures are recognized for WebGL fallback', () => {
     "Failed to execute 'createBuffer' on 'GPUDevice': mappedAtCreation"
   )), true);
   assert.equal(isWebGPUImplementationError(new Error('invalid checkpoint')), false);
+});
+
+test('sparse cross entropy avoids allocating a one-hot vocabulary tensor', () => {
+  const workerSource = new Function(`${workerMatch[0]}\nreturn WORKER_SOURCE;`)();
+  assert.doesNotMatch(workerSource, /tf\.oneHot\(flatTargets/);
+  assert.match(workerSource, /tf\.gatherND\(/);
+});
+
+test('worker normalizes invalid generation temperatures', () => {
+  const helpers = loadWorkerHelpers();
+  assert.equal(typeof helpers.normalizeTemperature, 'function');
+  assert.equal(helpers.normalizeTemperature(Number.NaN), 0.8);
+  assert.equal(helpers.normalizeTemperature(9), 2);
+});
+
+test('training random generator is reproducible from a seed', () => {
+  const first = loadWorkerHelpers().createSeededRandom(42);
+  const second = loadWorkerHelpers().createSeededRandom(42);
+  const firstValues = [first(), first(), first()];
+  const secondValues = [second(), second(), second()];
+  assert.deepEqual(firstValues, secondValues);
+  assert.notDeepEqual(firstValues, [0, 0, 0]);
+});
+
+test('checkpoint statistics are normalized before display or restore', () => {
+  const stats = loadWorkerHelpers().normalizeStats({
+    epoch: -4,
+    bestLoss: 'invalid',
+    smoothLoss: 1.25,
+    validationLoss: 0.75,
+    lossHistory: [1, Number.NaN, 2]
+  });
+  assert.equal(stats.epoch, 0);
+  assert.equal(stats.bestLoss, Infinity);
+  assert.equal(stats.validationLoss, 0.75);
+  assert.deepEqual(stats.lossHistory, [1, 2]);
+});
+
+test('checkpoint validation rejects duplicate vocabulary entries', () => {
+  const { validateCheckpoint } = loadWorkerHelpers();
+  const checkpoint = validCheckpoint();
+  checkpoint.vocab = ['a', 'a'];
+  assert.throws(() => validateCheckpoint(checkpoint), /vocabulary entries must be unique/);
+});
+
+test('GPU safety estimate includes attention and parameter cost without dividing by heads', () => {
+  assert.match(html, /function estimateLoad\(cfg\)/);
+  assert.doesNotMatch(html, /nLayers \* batch \* tokenFactor \/ Math\.max\(1, nHeads\)/);
+  assert.match(html, /parameter|paramCost/i);
+});
+
+test('clear local data removes the saved corpus as well as the checkpoint', () => {
+  assert.match(html, /delete\(['"]latest['"]\)/);
+  assert.match(html, /delete\(['"]trainingText['"]\)/);
+});
+
+test('runtime dependencies are local and cached by the service worker', () => {
+  assert.doesNotMatch(html, /https:\/\/cdn\.jsdelivr\.net/);
+  const serviceWorker = fs.readFileSync(path.join(root, 'docs', 'service-worker.js'), 'utf8');
+  assert.match(serviceWorker, /vendor\/tf\.min\.js/);
+  assert.match(serviceWorker, /vendor\/tf-backend-webgpu\.min\.js/);
+  for (const asset of ['tf.min.js', 'tf-backend-webgpu.min.js']) {
+    const data = fs.readFileSync(path.join(root, 'docs', 'vendor', asset));
+    const digest = crypto.createHash('sha384').update(data).digest('base64');
+    assert.match(html, new RegExp(`integrity="sha384-${digest}"`));
+  }
 });

@@ -1,0 +1,12 @@
+{
+  "name": "ai-models-trainer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static browser-only GPT trainer smoke tests",
+  "scripts": {
+    "test": "node --test tests/audit-smoke.test.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

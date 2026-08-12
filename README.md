@@ -78,6 +78,7 @@ Training runs off the main thread via a real Web Worker when the browser allows 
 - Export model → JSON file
 - Import model → restore it for generation or export
 - Autosave → stored in IndexedDB
+- Training text is also stored locally in IndexedDB; “Clear local data” removes both
 
 ⚠️ Only **schema v3** checkpoints are supported.
 
@@ -95,7 +96,7 @@ Training runs off the main thread via a real Web Worker when the browser allows 
 ## 🛠️ Technical Details
 
 - Framework: TensorFlow.js
-- Runtime dependency: TensorFlow.js 4.22.0, pinned on jsDelivr
+- Runtime dependency: TensorFlow.js 4.22.0, vendored in `docs/vendor/`
 - Backend:
   - WebGPU (preferred)
   - WebGL (fallback)
@@ -117,6 +118,20 @@ Training runs off the main thread via a real Web Worker when the browser allows 
 - Memory monitoring
 - Optional autosave throttling
 
+Training uses a reproducible seed (default `1337`) and a small validation split
+when the corpus contains enough windows. The validation loss is shown separately
+from the training loss and drives early stopping when available.
+
+## 🧰 Tests
+
+The smoke suite validates JavaScript, JSON, worker helpers, checkpoint limits,
+local runtime assets and PWA resources without starting TensorFlow.js or a GPU
+workload:
+
+```bash
+node --test tests/audit-smoke.test.cjs
+```
+
 ---
 
 ## 📸 UI
@@ -131,7 +146,7 @@ Training runs off the main thread via a real Web Worker when the browser allows 
 ## 📌 Notes
 
 - Training large models in-browser is experimental
-- The TensorFlow.js runtime is loaded from jsDelivr, so the first load requires network access
+- TensorFlow.js is vendored locally, so the installed PWA can start without downloading the runtime
 - Expect crashes if you push it too far
 - This is for learning and experimentation, not production
 
@@ -154,9 +169,9 @@ Because running a transformer in a browser is:
 
 ## 💡 Future Improvements
 
-- Better memory management
+- Binary checkpoints for very large models
 - Model quantization
-- Streaming generation
+- KV-cache-backed streaming generation
 - Multi-file datasets
 - Fine-tuning support
 

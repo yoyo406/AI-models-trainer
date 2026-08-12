@@ -3,11 +3,13 @@
  * Strategy: network-first for documents, stale-while-revalidate for local assets.
  */
 
-const CACHE_NAME = 'gptjs-v3';
+const CACHE_NAME = 'gptjs-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
+  './vendor/tf.min.js',
+  './vendor/tf-backend-webgpu.min.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];
@@ -42,7 +44,7 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// ── FETCH: cache-first for all same-origin requests ───────────────────────
+// ── FETCH: network-first documents, stale-while-revalidate local assets ────
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
